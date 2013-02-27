@@ -44,8 +44,8 @@ BOOL Init()
 
 void Cleanup()
 {
-  if (IntuitionBase) CloseLibrary((struct Library *)IntuitionBase);
-  if (MUIMasterBase) CloseLibrary((struct Library *) MUIMasterBase);
+  if (IntuitionBase) CloseLibrary(IntuitionBase);
+  if (MUIMasterBase) CloseLibrary(MUIMasterBase);
 }
 
 int main(int argc, char **argv)
