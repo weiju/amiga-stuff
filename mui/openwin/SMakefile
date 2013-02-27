@@ -1,0 +1,5 @@
+CC=sc
+LINK=slink
+
+main: main.c
+	$(CC) link main.c
