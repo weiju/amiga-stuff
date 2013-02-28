@@ -1,6 +1,6 @@
 #CC=vc +aos68k
 CC=vc +kick13
-CFLAGS=-c99 -I$(NDK_INC) -L$(NDK_LIB)
+CFLAGS=-c99 -I$(NDK_INC)
 
 all: intuition1 graphics1 copper1 dualplayfield1 ham1 ostest openwin
 
