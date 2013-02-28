@@ -12,8 +12,6 @@
 
 ;; takes a command line and modifies the params hash accordingly
 (define (process-command params line)
-;;  (cond [(string=? "##private" line) (hash-set! params "is-private" #T)]
-;;        [(string=? "##public" line) (hash-set! params "is-private" #F)])
   (print line)
   (cond [(string=? line "##private") (hash-set! params "is-private" #T)]
         [(string=? line "##public") (hash-set! params "is-private" #F)]
