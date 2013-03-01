@@ -9,68 +9,66 @@ of a scripting language.
 """
 import argparse
 import re
+import collections
 
 # the format of a function definition
 REGEX = re.compile('^([^()]+)\(([^()]*)\)\(([^()]*)\).*$')
 
-fd_settings = {}
-offset = 0
-is_public = False
+
+class FDState:
+    """represents the parser state"""
+    def __init__(self, base, public, offset):
+        self.base = base
+        self.public = public
+        self.offset = offset
 
 
-def process_command(command):
+def process_command(command, state):
     """process a FD command line"""
-    global fd_settings, is_public, offset
     if command.startswith('base'):
-        comps = command.split()
-        fd_settings[comps[0]] = comps[1]
+        state.base = command.split()[1]
     elif command.startswith('bias'):
-        if 'bias' in fd_settings:
-            raise Exception('multiple bias entries not yet supported')
-        else:
-            comps = command.split()
-            offset = int(comps[1])
-            fd_settings[comps[0]] = offset
+        state.offset = int(command.split()[1])
     elif command.startswith('private'):
-        is_public = False
+        state.public = False
     elif command.startswith('public'):
-        is_public = True
+        state.public = True
     elif command.startswith('end'):
         pass
     else:
         print "unsupported command: ", command
 
 
-def process_fundef(line):
+def process_fundef(line, state):
     """process a FD function definition"""
-    global offset
     match = REGEX.match(line)
     if match:
         name, params, regs = match.group(1, 2, 3)
-        if is_public:
+        if state.public:
             if len(params) > 0:
-                print "-%d -> %s(%s), [%s]" % (offset, name, params, regs)
+                print "-%d -> %s(%s), [%s]" % (state.offset,
+                                               name, params, regs)
             else:
-                print "-%d -> %s()" % (offset, name)
-        offset += 6
+                print "-%d -> %s()" % (state.offset, name)
+        state.offset += 6
 
 
-def process(input_file, output_dir):
+def process(input_file):
     """process the specified input file"""
+    state = FDState('', False, 0)
     with open(input_file) as infile:
         for line in infile:
             if line.startswith('*'):
                 pass
             elif line.startswith('##'):
-                process_command(line[2:])
+                process_command(line[2:], state)
             else:
-                process_fundef(line.strip())
+                process_fundef(line.strip(), state)
     print "Done."
 
 if __name__ == '__main__':
     description = """fdtool - stub generator for FD files (c) 2013"""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('--infile', required=True, help="FD input file")
-    parser.add_argument('--outdir', required=True, help="output directory")
     args = parser.parse_args()
-    process(args.infile, args.outdir)
+    process(args.infile)
