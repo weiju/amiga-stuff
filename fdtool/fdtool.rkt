@@ -3,6 +3,10 @@
 ;; Writing the tool in a Lisp makes is easier to run it on
 ;; a classic Amiga
 
+;; This file is intended to be used as a Racket module,
+;; so here are the exports
+(provide process-fd)
+
 ;; FD file comments start with a '*'
 (define (fd-comment? line)
   (char=? #\* (string-ref line 0)))
@@ -12,7 +16,7 @@
 
 ;; takes a command line and modifies the params hash accordingly
 (define (process-command params line)
-  (print line)
+  ;;(print line)
   (cond [(string=? line "##private") (hash-set! params "is-private" #T)]
         [(string=? line "##public") (hash-set! params "is-private" #F)]
         [(and (> (string-length line) 7) (string=? (substring line 0 6) "##base"))
@@ -21,12 +25,15 @@
          (hash-set! params "bias" (string->number (substring line 7)))])
   params)
 
+;; process a function definition, extracting the function name,
+;; the parameter names and the assigned registers
 (define (process-fundef params line)
-  ;; TODO
-  (printf "~s\n" line))
+  (let* ([fun-regexp #rx"^([^()]+)[(]([^()]*)[)][(]([^()]*)[)].*$"]
+         [fun-match (regexp-match fun-regexp line)])
+    (cond [fun-match (print (cdr fun-match))])))
 
 ;; Process the input file line-by-line
-(define (process filename)
+(define (process-fd filename)
   ;; params is a hash, could be a struct as well
   (let* ([params (make-hash '(("base" . "") ("is-private" . #T) ("bias" . 0)))]
          [lines (filter (lambda (x) (not (fd-comment? x))) (file->lines filename))])
