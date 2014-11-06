@@ -1,4 +1,4 @@
-#lang racket
+has#lang racket
 ;; This is the Racket version of fdtool.py
 ;; Writing the tool in a Lisp makes is easier to run it on
 ;; a classic Amiga
