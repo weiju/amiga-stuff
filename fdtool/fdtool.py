@@ -69,6 +69,6 @@ def process(input_file):
 if __name__ == '__main__':
     description = """fdtool - stub generator for FD files (c) 2013"""
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('--infile', required=True, help="FD input file")
+    parser.add_argument('infile', help="FD input file")
     args = parser.parse_args()
     process(args.infile)
