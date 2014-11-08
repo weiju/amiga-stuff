@@ -159,13 +159,15 @@ def parse_hunkfile(hunkfile):
             elif block[0] == 'BSS':
                 print("Block %d: '%s' -> %d" % (i, block[0], block[1]))
             elif block[0] == 'CODE':
-                print("%d: '%s'" % (i, block[0]))
+                print("%d: '%s', size = %d" % (i, block[0], len(block[1])))
+                print("----------------------------\n")
                 code = block[1]
                 offset = 0
                 while offset < len(code):
                     op, size = disassemble(code, offset)
                     print_instruction(offset, op)
                     offset += size
+                print("\n---------------------------\n")
             else:
                 print("Block %d: '%s'" % (i, block[0]))
 
