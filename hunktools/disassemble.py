@@ -13,7 +13,7 @@ ADDR_MODES_EXT = {
 
 OPCODE_CATEGORIES = {
     '0000': 'bitops_movep_imm', '0001': 'move.b', '0010': 'move.l', '0011': 'move.w',
-    '0100': 'misc', '1001': 'sub_subx',
+    '0100': 'misc', '0101': 'addq_subq', '1001': 'sub_subx',
     '0110': 'bcc_bsr_bra', '0111': 'moveq',
     '1101': 'add_addx'
 }
@@ -114,8 +114,11 @@ def disassemble_add_sub(name, bits, data, offset):
 
 
 def disassemble_misc(bits, data, offset):
+    print("misc bits: " + bits)
     if bits == '0100111001110101':  # rts
         return (('rts', ), 0)
+    elif bits == '0100101011111100': # illegal
+        return (('illegal', ), 0)
     elif bits[7:10] == '111':  # lea
         regnum = int(bits[4:7], 2)
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
@@ -129,12 +132,28 @@ def disassemble_misc(bits, data, offset):
     elif bits.startswith('01001010'):  # tst.x
         size = SIZES[int(bits[8:10], 2)]
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
-        return (('test.%s' % size, ea), added)
+        return (('tst.%s' % size, ea), added)
     else:
         print("unrecognized misc: %s" % bits)
         raise Exception('TODO Misc')
 
-def disassemble(data, offset):
+
+def signed8(value):
+    return -(256 - value) if value > 127 else value
+
+
+def branch_displacement(bits, data, offset):
+    """disp, added = read displacement"""
+    disp = signed8(int(bits[8:16], 2))
+    if disp == 0:  # 16 bit displacement
+        return next_word('W', data, offset + 2)
+    elif disp == -1:  # 32 bit displacement
+        return next_word('L', data, offset + 2)
+    else:
+        return disp, 0
+
+
+def _disassemble(data, offset):
     bits = "{0:016b}".format(struct.unpack(">H", data[offset:offset+2])[0])
     # first step categorize by looking at bits 15-12
     opcode = bits[0:4]
@@ -152,25 +171,26 @@ def disassemble(data, offset):
         op, added = disassemble_misc(bits, data, offset)
     elif category == 'moveq':
         regnum = int(bits[4:7], 2)
-        value = int(bits[8:16], 2)
-        op = ('moveq', value, 'D%d' % regnum)
+        value = signed8(int(bits[8:16], 2))
+        op = ('moveq', "#%d" % value, 'D%d' % regnum)
     elif category == 'bcc_bsr_bra':
-        if bits[0:16] == '01100000':  # bra
-            raise Exception('BRA TODO')
-        elif bits[0:16] == '01100001':  # bsr
-            raise Exception('BSR TODO')
+        if bits[0:8] == '01100000':  # bra
+            disp, added = branch_displacement(bits, data, offset)
+            op = ('bra', disp)
+        elif bits[0:8] == '01100001':  # bsr
+            disp, added = branch_displacement(bits, data, offset)
+            op = ('bsr', disp)
         else:
             cond = CONDITION_CODES[int(bits[4:8], 2)]
-            disp8 = int(bits[8:16], 2)
-            if disp8 == 0:
-                # 16 bit displacement TODO
-                raise Exception('16 bit branch displacement TODO')
-            elif disp8 == 255:
-                # 16 bit displacement TODO
-                raise Exception('16 bit branch displacement TODO')
-            if disp8 >= 128:
-                raise Exception('wrong value for signed displacement: %d', disp8)
-            return (('b%s' % cond, disp8), 2)
+            disp, added = branch_displacement(bits, data, offset)
+            op = ('b%s' % cond, disp)
+    elif category == 'addq_subq':
+        if bits[7] == '0':  # addq
+            ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
+            value = int(bits[4:7], 2)
+            op = ('addq', '#%d' % value, ea)
+        else:
+            raise Exception('TODO addq_subq etc')
     else:
         print("\nUnknown instruction\nCategory: ", category, " Bits: ", bits)
         raise Exception('TODO')
@@ -188,3 +208,11 @@ def print_instruction(address, op):
         print("$%08x:\t%8s" % (address, op[0]))
     else:
         raise Exception("can't print instruction with %d components" % len(op))
+
+
+def disassemble(code):
+    offset = 0
+    while offset < len(code):
+        op, size = _disassemble(code, offset)
+        print_instruction(offset, op)
+        offset += size

@@ -5,7 +5,7 @@ an Amiga Hunk file.
 import argparse
 import struct
 
-from disassemble import disassemble, print_instruction
+from disassemble import disassemble
 
 HUNK_BLOCK_UNIT         = b'\x00\x00\x03\xe7'
 HUNK_BLOCK_NAME         = b'\x00\x00\x03\xe8'
@@ -162,11 +162,8 @@ def parse_hunkfile(hunkfile):
                 print("%d: '%s', size = %d" % (i, block[0], len(block[1])))
                 print("----------------------------\n")
                 code = block[1]
-                offset = 0
-                while offset < len(code):
-                    op, size = disassemble(code, offset)
-                    print_instruction(offset, op)
-                    offset += size
+                disassemble(code)
+
                 print("\n---------------------------\n")
             else:
                 print("Block %d: '%s'" % (i, block[0]))
