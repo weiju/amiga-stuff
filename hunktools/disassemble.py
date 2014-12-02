@@ -32,6 +32,49 @@ CONDITION_CODES = [
     'ge', 'lt', 'gt', 'le'
 ]
 
+class Opcode(object):
+    def __init__(self, name, size):
+        self.name = name
+        self.size = size
+
+    def is_branch(self):
+        return False
+
+    def __repr__(self):
+        return "%s" % self.name
+
+class Operation2(Opcode):
+    def __init__(self, name, size, src, dest):
+        Opcode.__init__(self, name, size)
+        self.src = src
+        self.dest = dest
+
+    def __repr__(self):
+        return "%s\t%s,%s" % (self.name, self.src, self.dest)
+
+
+class Operation1(Opcode):
+    """A single operand operation"""
+
+    def __init__(self, name, size, dest):
+        Opcode.__init__(self, name, size)
+        self.dest = dest
+
+    def __repr__(self):
+        return "%s\t%s" % (self.name, self.dest)
+
+
+class Jump(Opcode):
+    def __init__(self, name, size, displacement):
+        Opcode.__init__(self, name, size)
+        self.displacement = displacement
+
+    def is_branch(self):
+        return True
+
+    def __repr__(self):
+        return "%s\t%s" % (self.name, self.displacement)
+
 
 def is_move(category):
     return category in {'move.b', 'move.w', 'move.l'}
@@ -82,7 +125,7 @@ def operand(size, mode_bits, reg_bits, data, offset):
 
 def disassemble_move(bits, data, offset):
     category = OPCODE_CATEGORIES[bits[0:4]]
-    total_added = 0
+    total_added = 2
     # dst: reg|mode
     dst_op, added = operand(category[-1], bits[7:10], bits[4:7], data, offset)
     total_added += added
@@ -90,12 +133,11 @@ def disassemble_move(bits, data, offset):
     # src: mode|reg
     src_op,added = operand(category[-1], bits[10:13], bits[13:16], data, offset)
     total_added += added
-
-    return ((category, src_op, dst_op), total_added)
+    return Operation2(category, total_added, src_op, dst_op)
 
 
 def disassemble_add_sub(name, bits, data, offset):
-    total_added = 0
+    total_added = 2
     reg = "D%d" % int(bits[4:7], 2)
     size, operation = ADD_SUB_OPMODES[bits[7:10]]
     ea, added = operand(size, bits[10:13], bits[13:16], data, offset)
@@ -110,29 +152,29 @@ def disassemble_add_sub(name, bits, data, offset):
     else:
         raise Exception('Unknown operation for %s' % name)
 
-    return (('%s.%s' % (name, size), src, dst), total_added)
+    return Operation2('%s.%s' % (name, size), total_added, src, dst)
 
 
 def disassemble_misc(bits, data, offset):
-    print("misc bits: " + bits)
+    #print("misc bits: " + bits)
     if bits == '0100111001110101':  # rts
-        return (('rts', ), 0)
+        return Opcode('rts', 2)
     elif bits == '0100101011111100': # illegal
-        return (('illegal', ), 0)
+        return Opcode('illegal', 2)
     elif bits[7:10] == '111':  # lea
         regnum = int(bits[4:7], 2)
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
-        return (('lea', ea, 'A%d' % regnum), added)
+        return Operation2('lea', added + 2, ea, 'A%d' % regnum)
     elif bits.startswith('0100111010'):  # jsr
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
-        return (('jsr', ea), added)
+        return Jump('jsr', added + 2, ea)
     elif bits.startswith('0100111011'):  # jmp
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
-        return (('jmp', ea), added)
+        return Jump('jmp', added + 2, ea)
     elif bits.startswith('01001010'):  # tst.x
         size = SIZES[int(bits[8:10], 2)]
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
-        return (('tst.%s' % size, ea), added)
+        return Operation1('tst.%s' % size, added + 2, ea)
     else:
         print("unrecognized misc: %s" % bits)
         raise Exception('TODO Misc')
@@ -158,46 +200,47 @@ def _disassemble(data, offset):
     # first step categorize by looking at bits 15-12
     opcode = bits[0:4]
     category = OPCODE_CATEGORIES[opcode]
-    added = 0
 
     if is_move(category):
-        op, added = disassemble_move(bits, data, offset)
+        instr = disassemble_move(bits, data, offset)
     elif category in {'add_addx', 'sub_subx'}:
         if bits[7] == 1 and bits[10:12] == '11':  # extended
             raise Exception('addx/subx not supported yet')
         else:
-            op, added = disassemble_add_sub(category[0:3], bits, data, offset)
+            instr = disassemble_add_sub(category[0:3], bits, data, offset)
     elif category == 'misc':
-        op, added = disassemble_misc(bits, data, offset)
+        instr = disassemble_misc(bits, data, offset)
     elif category == 'moveq':
         regnum = int(bits[4:7], 2)
         value = signed8(int(bits[8:16], 2))
-        op = ('moveq', "#%d" % value, 'D%d' % regnum)
+        instr = Operation2('moveq', 2, "#%d" % value, 'D%d' % regnum)
     elif category == 'bcc_bsr_bra':
         if bits[0:8] == '01100000':  # bra
             disp, added = branch_displacement(bits, data, offset)
-            op = ('bra', disp)
+            instr = Jump('bra', added + 2, disp)
         elif bits[0:8] == '01100001':  # bsr
             disp, added = branch_displacement(bits, data, offset)
-            op = ('bsr', disp)
+            instr = Jump('bsr', added + 2, disp)
         else:
             cond = CONDITION_CODES[int(bits[4:8], 2)]
             disp, added = branch_displacement(bits, data, offset)
-            op = ('b%s' % cond, disp)
+            instr = Jump('b%s' % cond, added + 2, disp)
     elif category == 'addq_subq':
         if bits[7] == '0':  # addq
             ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
             value = int(bits[4:7], 2)
-            op = ('addq', '#%d' % value, ea)
+            instr = Operation2('addq', added + 2, '#%d' % value, ea)
         else:
             raise Exception('TODO addq_subq etc')
     else:
         print("\nUnknown instruction\nCategory: ", category, " Bits: ", bits)
         raise Exception('TODO')
-    return (op, 2 + added)
+    return instr
 
 
 def print_instruction(address, op):
+    print("$%08x:\t%s" % (address, op))
+    """
     if len(op) == 3:
         opcode, src, dst = op
         print("$%08x:\t%8s %s,%s" % (address, opcode, src, dst))
@@ -208,11 +251,22 @@ def print_instruction(address, op):
         print("$%08x:\t%8s" % (address, op[0]))
     else:
         raise Exception("can't print instruction with %d components" % len(op))
-
+    """
 
 def disassemble(code):
+    """Disassembling a chunk of code works on this assumptions:
+
+    1. the first address in the block contains a valid instruction from here
+      a. branches: add the displacement target to the list of continue points
+      b. if the instruction is an absolute jump/branch, we can't safely
+         assume the code after the instruction is valid -> continue at branch
+         target
+      c. conditional branch -> add the address after the instruction as a valid
+         ass valid decoding location
+      d. rts: we can't assume the code after this instruction is valid
+    """
     offset = 0
     while offset < len(code):
-        op, size = _disassemble(code, offset)
-        print_instruction(offset, op)
-        offset += size
+        instr = _disassemble(code, offset)
+        print_instruction(offset, instr)
+        offset += instr.size
