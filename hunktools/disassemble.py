@@ -1,4 +1,5 @@
 import struct
+from collections import deque
 
 
 ADDR_MODES = {
@@ -40,6 +41,15 @@ class Opcode(object):
     def is_branch(self):
         return False
 
+    def is_absolute_branch(self):
+        return False
+
+    def is_local_branch(self):
+        return False
+
+    def is_return(self):
+        return self.name == 'rts'
+
     def __repr__(self):
         return "%s" % self.name
 
@@ -71,6 +81,14 @@ class Jump(Opcode):
 
     def is_branch(self):
         return True
+
+    def is_absolute_branch(self):
+        return self.name == 'bra'
+
+    def is_local_branch(self):
+        """a very simplified model assumption of a local branch for now, which
+        excludes jumps"""
+        return self.name.startswith('b')
 
     def __repr__(self):
         return "%s\t%s" % (self.name, self.displacement)
@@ -238,35 +256,52 @@ def _disassemble(data, offset):
     return instr
 
 
-def print_instruction(address, op):
-    print("$%08x:\t%s" % (address, op))
-    """
-    if len(op) == 3:
-        opcode, src, dst = op
-        print("$%08x:\t%8s %s,%s" % (address, opcode, src, dst))
-    elif len(op) == 2:
-        opcode, ea = op
-        print("$%08x:\t%8s %s" % (address, opcode, ea))
-    elif len(op) == 1:
-        print("$%08x:\t%8s" % (address, op[0]))
-    else:
-        raise Exception("can't print instruction with %d components" % len(op))
-    """
+def print_instruction(address, instr):
+    print("$%08x:\t%s" % (address, instr))
+
 
 def disassemble(code):
     """Disassembling a chunk of code works on this assumptions:
 
-    1. the first address in the block contains a valid instruction from here
-      a. branches: add the displacement target to the list of continue points
+    the first address in the block contains a valid instruction from here
+      a. branches: add the branch target to the list of continue points
       b. if the instruction is an absolute jump/branch, we can't safely
          assume the code after the instruction is valid -> continue at branch
          target
       c. conditional branch -> add the address after the instruction as a valid
          ass valid decoding location
       d. rts: we can't assume the code after this instruction is valid
+
+    In order to achieve an ordered sequence of instructions, we store the
+    disassembled instructions and their addresses in a list and sort them
+    in ascending order after completion
     """
-    offset = 0
-    while offset < len(code):
+    reachable = deque([0])
+    seen = set()
+    result = []
+    while len(reachable) > 0:  # offset < len(code):
+        offset = reachable.popleft()
+        print("offset is now: %d" % offset)
+        seen.add(offset)
         instr = _disassemble(code, offset)
-        print_instruction(offset, instr)
-        offset += instr.size
+        result.append((offset, instr))
+
+        if instr.is_return():
+            continue  # we can't assume any valid code to come after a return
+
+        if not instr.is_absolute_branch():
+            new_dest = offset + instr.size
+            if new_dest not in seen:
+                reachable.append(new_dest)
+
+        # following jumps and branches is non-trivial
+        # the problem is that we need to be able to tell local
+        # from global branches
+        if instr.is_local_branch():
+            branch_dest = offset + instr.size + instr.displacement
+            if not branch_dest in seen:
+                reachable.append(branch_dest)
+
+    result.sort(key=lambda x: x[0])
+    for addr, instr in result:
+        print_instruction(addr, instr)
