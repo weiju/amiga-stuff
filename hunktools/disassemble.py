@@ -33,6 +33,81 @@ CONDITION_CODES = [
     'ge', 'lt', 'gt', 'le'
 ]
 
+######################################################################
+#### Operand classes / Addressing modes
+######################################################################
+
+class IntConstant:
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return '#%d' % self.value
+
+
+class DataRegister:
+    def __init__(self, regnum):
+        self.regnum = regnum
+
+    def __repr__(self):
+        return 'd%d' % self.regnum
+
+
+class AddressRegister:
+    def __init__(self, regnum):
+        self.regnum = regnum
+
+    def __repr__(self):
+        return 'a%d' % self.regnum
+
+
+class AddressRegisterIndirect:
+    def __init__(self, regnum):
+        self.regnum = regnum
+
+    def __repr__(self):
+        return '(a%d)' % self.regnum
+
+
+class AddressRegisterIndirectPost:
+    def __init__(self, regnum):
+        self.regnum = regnum
+
+    def __repr__(self):
+        return '(a%d)+' % self.regnum
+
+
+class AddressRegisterIndirectPre:
+    def __init__(self, regnum):
+        self.regnum = regnum
+
+    def __repr__(self):
+        return '-(a%d)' % self.regnum
+
+
+class AddressRegisterIndirectDisplacement:
+    def __init__(self, regnum, displacement):
+        self.regnum = regnum
+        self.displacement = displacement
+
+    def __repr__(self):
+        return '%d(a%d)' % (self.displacement, self.regnum)
+
+
+class AddressRegisterIndirectDisplacementIndex:
+    def __init__(self, regnum, displacement, index):
+        self.regnum = regnum
+        self.displacement = displacement
+        self.index = iindex
+
+    def __repr__(self):
+        return '(%d,a%d,%d)' % (self.displacement, self.regnum, self.index)
+
+
+######################################################################
+#### Opcode classes
+######################################################################
+
 class Opcode(object):
     def __init__(self, name, size):
         self.name = name
@@ -87,7 +162,8 @@ class Jump(Opcode):
 
     def is_local_branch(self):
         """a very simplified model assumption of a local branch for now, which
-        excludes jumps"""
+        excludes jumps. An improved version will also look at the relocation
+        addresses, since a relocation target is likely a local address"""
         return self.name.startswith('b')
 
     def __repr__(self):
@@ -122,7 +198,7 @@ def operand(size, mode_bits, reg_bits, data, offset):
         regnum = int(reg_bits, 2)
         if mode == '#<data>':
             imm_value, added = next_word(size, data, offset + 2)
-            result = "#%d" % imm_value
+            result = IntConstant(imm_value)
         elif mode in {'(xxx).L', '(xxx).W'}:  # absolute
             addr, added = next_word(mode[-1], data, offset + 2)
             result = "%d.%s" % (addr, mode[-1])
@@ -134,10 +210,22 @@ def operand(size, mode_bits, reg_bits, data, offset):
     elif mode == '(d16,An)':
         regnum = int(reg_bits, 2)
         disp16, added = next_word('W', data, offset + 2)
-        result = "%d(A%d)" % (disp16, regnum)
+        result = AddressRegisterIndirectDisplacement(regnum, disp16)
+    elif mode == 'An':
+        result = AddressRegister(int(reg_bits, 2))
+    elif mode == '(An)':
+        result = AddressRegisterIndirect(int(reg_bits, 2))
+    elif mode == '(An)+':
+        result = AddressRegisterIndirectPost(int(reg_bits, 2))
+    elif mode == '-(An)':
+        result = AddressRegisterIndirectPre(int(reg_bits, 2))
+    elif mode == '(d8,An,Xn)':
+        #result = AddressRegisterIndirectDisplacementIndex(int(reg_bits, 2))
+        raise Exception('unsupported mode: ', mode)
+    elif mode == 'Dn':
+        result = DataRegister(int(reg_bits, 2))
     else:
-        regnum = int(reg_bits, 2)
-        result = mode.replace('n', str(regnum))
+        raise Exception('unsupported mode: ', mode)
     return result, added
     
 
@@ -182,7 +270,7 @@ def disassemble_misc(bits, data, offset):
     elif bits[7:10] == '111':  # lea
         regnum = int(bits[4:7], 2)
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
-        return Operation2('lea', added + 2, ea, 'A%d' % regnum)
+        return Operation2('lea', added + 2, ea, AddressRegister(regnum))
     elif bits.startswith('0100111010'):  # jsr
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
         return Jump('jsr', added + 2, ea)
@@ -231,7 +319,7 @@ def _disassemble(data, offset):
     elif category == 'moveq':
         regnum = int(bits[4:7], 2)
         value = signed8(int(bits[8:16], 2))
-        instr = Operation2('moveq', 2, "#%d" % value, 'D%d' % regnum)
+        instr = Operation2('moveq', 2, IntConstant(value), DataRegister(regnum))
     elif category == 'bcc_bsr_bra':
         if bits[0:8] == '01100000':  # bra
             disp, added = branch_displacement(bits, data, offset)
@@ -247,7 +335,7 @@ def _disassemble(data, offset):
         if bits[7] == '0':  # addq
             ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
             value = int(bits[4:7], 2)
-            instr = Operation2('addq', added + 2, '#%d' % value, ea)
+            instr = Operation2('addq', added + 2, IntConstant(value), ea)
         else:
             raise Exception('TODO addq_subq etc')
     else:
@@ -281,7 +369,7 @@ def disassemble(code):
     result = []
     while len(reachable) > 0:  # offset < len(code):
         offset = reachable.popleft()
-        print("offset is now: %d" % offset)
+        #print("offset is now: %d" % offset)
         seen.add(offset)
         instr = _disassemble(code, offset)
         result.append((offset, instr))
@@ -291,7 +379,7 @@ def disassemble(code):
 
         if not instr.is_absolute_branch():
             new_dest = offset + instr.size
-            if new_dest not in seen:
+            if new_dest < len(code) and new_dest not in seen:
                 reachable.append(new_dest)
 
         # following jumps and branches is non-trivial

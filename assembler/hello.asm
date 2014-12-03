@@ -29,7 +29,11 @@ strlen:
 	jsr	_LVOCloseLibrary(a6)
 nodos:
 	moveq	#0,d0
+  	jsr	dummy
 	rts
+
+dummy:	rts
+
 dosname:
 	dc.b	'dos.library',0
 msg:

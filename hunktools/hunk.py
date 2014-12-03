@@ -165,6 +165,8 @@ def parse_hunkfile(hunkfile):
                 disassemble(code)
 
                 print("\n---------------------------\n")
+            elif block[0] == 'RELOC32':
+                print("%d: '%s': %s" % (i, block[0], block[1]))
             else:
                 print("Block %d: '%s'" % (i, block[0]))
 
