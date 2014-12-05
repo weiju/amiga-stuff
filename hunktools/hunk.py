@@ -173,22 +173,21 @@ def parse_hunkfile(hunkfile):
             names = ','.join([block[0] for block in group])
             print("Group %d -> %s" % (i, names))
 
-        """
-        for i, block in enumerate(blocks):
+            block = group[0]
             if block[0] == 'NAME':
                 print("%d: '%s' -> '%s'" % (i, block[0], block[1]))
             elif block[0] == 'BSS':
                 print("%d: '%s' -> %d" % (i, block[0], block[1]))
             elif block[0] == 'CODE':
                 print("%d: '%s', size = %d" % (i, block[0], len(block[1])))
-                #print("----------------------------\n")
-                #code = block[1]
-                #disassemble(code)
-                #print("\n---------------------------\n")
-            elif block[0] == 'RELOC32':
-                print("%d: '%s': %s" % (i, block[0], block[1]))
+                print("----------------------------\n")
+                code = block[1]
+                disassemble(code)
+                print("\n---------------------------\n")
+            #elif block[0] == 'RELOC32':
+            #    print("%d: '%s': %s" % (i, block[0], block[1]))
             else:
-                print("%d: '%s'" % (i, block[0]))"""
+                print("%d: '%s'" % (i, block[0]))
 
 
 if __name__ == '__main__':

@@ -16,7 +16,7 @@ OPCODE_CATEGORIES = {
     '0000': 'bitops_movep_imm', '0001': 'move.b', '0010': 'move.l', '0011': 'move.w',
     '0100': 'misc', '0101': 'addq_subq', '1001': 'sub_subx',
     '0110': 'bcc_bsr_bra', '0111': 'moveq',
-    '1101': 'add_addx'
+    '1101': 'add_addx', '1110': 'shift_rotate'
 }
 
 ADD_SUB_OPMODES = {
@@ -187,7 +187,7 @@ def next_word(size, data, data_offset):
     return (value, added)
 
 
-def operand(size, mode_bits, reg_bits, data, offset):
+def operand(size, mode_bits, reg_bits, data, offset, skip=0):
     result = ""
     added = 0
     mode = ADDR_MODES[mode_bits]
@@ -197,19 +197,19 @@ def operand(size, mode_bits, reg_bits, data, offset):
         mode = ADDR_MODES_EXT[reg_bits]
         regnum = int(reg_bits, 2)
         if mode == '#<data>':
-            imm_value, added = next_word(size, data, offset + 2)
+            imm_value, added = next_word(size, data, offset + 2 + skip)
             result = IntConstant(imm_value)
         elif mode in {'(xxx).L', '(xxx).W'}:  # absolute
-            addr, added = next_word(mode[-1], data, offset + 2)
+            addr, added = next_word(mode[-1], data, offset + 2 + skip)
             result = "%d.%s" % (addr, mode[-1])
         elif mode == '(d16,PC)':
-            disp16, added = next_word('W', data, offset + 2)
+            disp16, added = next_word('W', data, offset + 2 + skip)
             result = "%d(PC)" % disp16
         else:
             raise Exception("unsupported ext mode: '%s'" % mode)
     elif mode == '(d16,An)':
         regnum = int(reg_bits, 2)
-        disp16, added = next_word('W', data, offset + 2)
+        disp16, added = next_word('W', data, offset + 2 + skip)
         result = AddressRegisterIndirectDisplacement(regnum, disp16)
     elif mode == 'An':
         result = AddressRegister(int(reg_bits, 2))
@@ -338,9 +338,19 @@ def _disassemble(data, offset):
             instr = Operation2('addq', added + 2, IntConstant(value), ea)
         else:
             raise Exception('TODO addq_subq etc')
+    elif category == 'bitops_movep_imm':
+        if bits[0:10] == '0000100000':
+            ea, added1 = operand('l', bits[10:13], bits[13:16], data, offset, skip=2)
+            bitnum, added2 = next_word('W', data, offset + 2)
+            instr = Operation2('btst', added1 + added2 + 2, bitnum & 0xff, ea)
+        else:
+            detail = bits[8:11]
+            print("bits at offset: %d -> %s" % (offset, bits))
+            raise Exception('TODO: bitops, detail: ' + detail)
     else:
         print("\nUnknown instruction\nCategory: ", category, " Bits: ", bits)
         raise Exception('TODO')
+    #print("%d: %s" % (offset, instr))
     return instr
 
 
@@ -386,7 +396,9 @@ def disassemble(code):
         # the problem is that we need to be able to tell local
         # from global branches
         if instr.is_local_branch():
-            branch_dest = offset + instr.size + instr.displacement
+            # note that the branch target is computed based on the address after the
+            # 16 bit opcode, ignoring additional extension words in the displacement
+            branch_dest = offset + 2 + instr.displacement
             if not branch_dest in seen:
                 reachable.append(branch_dest)
 
