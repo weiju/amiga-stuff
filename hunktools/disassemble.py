@@ -14,7 +14,7 @@ ADDR_MODES_EXT = {
 
 OPCODE_CATEGORIES = {
     '0000': 'bitops_movep_imm', '0001': 'move.b', '0010': 'move.l', '0011': 'move.w',
-    '0100': 'misc', '0101': 'addq_subq', '1001': 'sub_subx',
+    '0100': 'misc', '0101': 'addq_subq', '1001': 'sub_subx', '1011': 'cmp_eor',
     '0110': 'bcc_bsr_bra', '0111': 'moveq',
     '1101': 'add_addx', '1110': 'shift_rotate'
 }
@@ -182,6 +182,10 @@ def next_word(size, data, data_offset):
         data[data_offset:data_offset+2]
         value = struct.unpack('>h', data[data_offset:data_offset+2])[0]
         added = 2
+    elif size == 'B':
+        data[data_offset:data_offset+2]
+        value = (struct.unpack('>h', data[data_offset:data_offset+2])[0]) & 0xff
+        added = 2
     else:
         raise Exception('unsupported size: ', size)
     return (value, added)
@@ -342,11 +346,18 @@ def _disassemble(data, offset):
         if bits[0:10] == '0000100000':
             ea, added1 = operand('l', bits[10:13], bits[13:16], data, offset, skip=2)
             bitnum, added2 = next_word('W', data, offset + 2)
-            instr = Operation2('btst', added1 + added2 + 2, bitnum & 0xff, ea)
+            instr = Operation2('btst', added1 + added2 + 2, IntConstant(bitnum & 0xff), ea)
+        elif bits[0:8] == '00001100':
+            size = SIZES[int(bits[8:10], 2)]
+            immdata, added1 = next_word(size.upper(), data, offset + 2)
+            ea, added2 = operand(size, bits[10:13], bits[13:16], data, offset, skip=added1)
+            instr = Operation2('cmpi.' + size, added1 + added2 + 2, IntConstant(immdata), ea)
         else:
             detail = bits[8:11]
             print("bits at offset: %d -> %s" % (offset, bits))
             raise Exception('TODO: bitops, detail: ' + detail)
+    elif category == 'cmp_eor':
+        raise Exception('TODO: cmp_eor')
     else:
         print("\nUnknown instruction\nCategory: ", category, " Bits: ", bits)
         raise Exception('TODO')

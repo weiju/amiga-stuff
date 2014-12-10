@@ -122,7 +122,46 @@ def read_blocks(infile, is_loadfile):
         block = read_block(infile, is_loadfile)
     return result
 
-def parse_hunkfile(hunkfile):
+
+def group_blocks(blocks):
+    """group the blocks into relocation groups"""
+    groups = []
+    for block in blocks:
+        if block[0] in {'NAME', 'UNIT'}:
+            continue
+        elif block[0] in {'BSS', 'CODE', 'DATA'}:
+            current_group = []
+
+        if block[0] == 'END':
+            groups.append(current_group)
+            current_group = []
+        else:
+            current_group.append(block)
+    return groups
+
+def print_hunks(hunks):
+    for i, hunk in enumerate(hunks):
+        block = hunk[0]
+        if block[0] == 'NAME':
+            print("%d: '%s' -> '%s'" % (i, block[0], block[1]))
+        elif block[0] == 'BSS':
+            print("%d: '%s' -> %d" % (i, block[0], block[1]))
+        elif block[0] == 'CODE':
+            print("%d: '%s', size = %d" % (i, block[0], len(block[1])))
+            code = block[1]
+            disassemble(code)
+        else:
+            print("%d: '%s'" % (i, block[0]))
+
+
+def print_overview(hunks):
+    for i, hunk in enumerate(hunks):
+        print(" %d: %s" % (i, hunk[0][0]))
+        for block in hunk[1:]:
+            print("    %s" % block[0])
+        print("    END")
+
+def parse_hunkfile(hunkfile, disassemble):
     """Top level parsing function"""
     with open(hunkfile, 'rb') as infile:
         id = infile.read(4)
@@ -130,69 +169,45 @@ def parse_hunkfile(hunkfile):
         # can be Header or Unit
         is_loadfile = True
         if id == HUNK_BLOCK_HEADER:
+            print("Hunk Header (03f3)")
             library_names = read_string_list(infile)
-            print("Libraries: ", library_names)
+            print("\tLibraries: ", library_names)
             hunk_table_size = read_int32(infile)
-            print("size hunk table: %d" % hunk_table_size)
             first_slot = read_int32(infile)
             last_slot = read_int32(infile)
+            print("\t%d hunks (%d-%d)\n" % (hunk_table_size, first_slot, last_slot))
             num_hunk_sizes = last_slot - first_slot + 1
+            """
             print("first slot: %d, last slot: %d, # hunk sizes: %d" % (first_slot,
                                                                        last_slot,
                                                                        num_hunk_sizes))
+            """
             hunk_sizes = [read_int32(infile) for i in range(num_hunk_sizes)]
-            print("hunk sizes: ", hunk_sizes)
+            #print("hunk sizes: ", hunk_sizes)
         elif id == HUNK_BLOCK_UNIT:
             strlen = read_int32(infile) * 4
             #print("# name: %d" % strlen)
             unit_name = str(infile.read(strlen))
-            print("UNIT '%s'" % unit_name)
-            print("---------------------------------------------")
+            print("Hunk unit (03e7)")
+            print("\tName: %s\n" % unit_name)
         else:
             is_loadfile = False
             raise Exception('Unsupported header type')
         
         blocks = read_blocks(infile, is_loadfile)
-        #print("%d blocks read: " % len(blocks))
+        hunks = group_blocks(blocks)
 
-        # group the blocks into relocation groups
-        groups = []
-        for block in blocks:
-            if block[0] in {'NAME', 'UNIT'}:
-                continue
-            elif block[0] in {'BSS', 'CODE', 'DATA'}:
-                current_group = []
-
-            if block[0] == 'END':
-                groups.append(current_group)
-                current_group = []
-            else:
-                current_group.append(block)
-
-        for i, group in enumerate(groups):
-            names = ','.join([block[0] for block in group])
-            print("Group %d -> %s" % (i, names))
-
-            block = group[0]
-            if block[0] == 'NAME':
-                print("%d: '%s' -> '%s'" % (i, block[0], block[1]))
-            elif block[0] == 'BSS':
-                print("%d: '%s' -> %d" % (i, block[0], block[1]))
-            elif block[0] == 'CODE':
-                print("%d: '%s', size = %d" % (i, block[0], len(block[1])))
-                print("----------------------------\n")
-                code = block[1]
-                disassemble(code)
-                print("\n---------------------------\n")
-            #elif block[0] == 'RELOC32':
-            #    print("%d: '%s': %s" % (i, block[0], block[1]))
-            else:
-                print("%d: '%s'" % (i, block[0]))
-
+        if disassemble:
+            print_hunks(hunks)
+        else:
+            print_overview(hunks)
 
 if __name__ == '__main__':
-    description = """hunk - hunk file reader (c) 2014 Wei-ju Wu"""
+    description = """dalf.py - Dumps Amiga Load Files with Python (c) 2014 Wei-ju Wu"""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('hunkfile', help="hunk format file")
+    parser.add_argument('--disassemble', action="store_true", default=False,
+                        help="show disassembly")
+
     args = parser.parse_args()
-    parse_hunkfile(args.hunkfile)
+    parse_hunkfile(args.hunkfile, disassemble=args.disassemble)
