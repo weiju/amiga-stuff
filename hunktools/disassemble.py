@@ -19,7 +19,7 @@ OPCODE_CATEGORIES = {
     '1101': 'add_addx', '1110': 'shift_rotate'
 }
 
-ADD_SUB_OPMODES = {
+OPMODES = {
     '000': ('b', 'ea,dn->dn'), '001': ('w', 'ea,dn->dn'),'010': ('l', 'ea,dn->dn'),
     '100': ('b', 'dn,ea->ea'), '101': ('w', 'dn,ea->ea'),'110': ('l', 'dn,ea->ea')
 }
@@ -249,7 +249,7 @@ def disassemble_move(bits, data, offset):
 def disassemble_add_sub(name, bits, data, offset):
     total_added = 2
     reg = "D%d" % int(bits[4:7], 2)
-    size, operation = ADD_SUB_OPMODES[bits[7:10]]
+    size, operation = OPMODES[bits[7:10]]
     ea, added = operand(size, bits[10:13], bits[13:16], data, offset)
     total_added += added
 
@@ -357,7 +357,15 @@ def _disassemble(data, offset):
             print("bits at offset: %d -> %s" % (offset, bits))
             raise Exception('TODO: bitops, detail: ' + detail)
     elif category == 'cmp_eor':
-        raise Exception('TODO: cmp_eor')
+        regnum = int(bits[4:7], 2)
+        opmode = bits[7:10]
+        addr_mode = OPMODES[opmode]
+        size = addr_mode[0]
+        if addr_mode[1] == 'ea,dn->dn':
+            ea, added = operand(size, bits[10:13], bits[13:16], data, offset)
+            instr = Operation2('cmp.' + size, added + 2, ea, DataRegister(regnum))
+        else:
+            raise Exception('TODO: cmp_eor')
     else:
         print("\nUnknown instruction\nCategory: ", category, " Bits: ", bits)
         raise Exception('TODO')
