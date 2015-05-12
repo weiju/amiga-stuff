@@ -9,7 +9,8 @@ SIZE_CLASSIC = 0x40000
 SIZE_MODERN  = 0x80000
 MAX_ROM_SIZE = SIZE_MODERN
 
-def decode_cloanto(rom, key, real_size):
+def decode_cloanto(rom, key):
+    """Decodes an encoded Kickstart ROM and returns a decoded ROM"""
     rom = bytearray(rom)
     key = bytearray(key)
     result = bytearray(len(rom))
@@ -39,7 +40,7 @@ if __name__ == '__main__':
             size = len(data)
             if size != SIZE_CLASSIC and size != SIZE_MODERN:
                 raise Exception("invalid rom size")
-            decoded = decode_cloanto(data, key_data, len(data))
+            decoded = decode_cloanto(data, key_data)
             with open(args.target, 'wb') as outfile:
                 outfile.write(bytes(decoded))
         else:
