@@ -2,6 +2,7 @@
 """A tool like dalf.rexx that can be used to inspect the structure of
 an Amiga Hunk file.
 """
+import os
 import argparse
 import struct
 
@@ -154,6 +155,14 @@ def print_hunks(hunks):
             print("%d: '%s'" % (i, block[0]))
 
 
+def dump_code_hunks(hunkfile, hunks):
+    for i, hunk in enumerate(hunks):
+        block = hunk[0]
+        if block[0] == 'CODE':
+            with open("%s-%02d" % (hunkfile, i), 'wb') as outfile:
+                outfile.write(block[1])
+
+
 def print_overview(hunks):
     for i, hunk in enumerate(hunks):
         print(" %d: %s" % (i, hunk[0][0]))
@@ -161,7 +170,7 @@ def print_overview(hunks):
             print("    %s" % block[0])
         print("    END")
 
-def parse_hunkfile(hunkfile, disassemble):
+def parse_hunkfile(hunkfile, disassemble, dump_code):
     """Top level parsing function"""
     with open(hunkfile, 'rb') as infile:
         id = infile.read(4)
@@ -202,12 +211,17 @@ def parse_hunkfile(hunkfile, disassemble):
         else:
             print_overview(hunks)
 
+        if dump_code:
+            dump_code_hunks(hunkfile, hunks)
+
 if __name__ == '__main__':
     description = """dalf.py - Dumps Amiga Load Files with Python (c) 2014 Wei-ju Wu"""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('hunkfile', help="hunk format file")
     parser.add_argument('--disassemble', action="store_true", default=False,
                         help="show disassembly")
+    parser.add_argument('--dump_code', action="store_true", default=False,
+                        help="dump each code hunk to a separate file")
 
     args = parser.parse_args()
-    parse_hunkfile(args.hunkfile, disassemble=args.disassemble)
+    parse_hunkfile(args.hunkfile, disassemble=args.disassemble, dump_code=args.dump_code)
