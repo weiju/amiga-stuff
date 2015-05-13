@@ -5,9 +5,13 @@ Convert Cloanto ROM to normal Kickstart ROM
 import argparse
 
 CLOANTO_ID = b'AMIROMTYPE1'
+SIZE_BOOTROM = 0x2000
+SIZE_590     = 0x4000
+SIZE_4091    = 0x8000
 SIZE_CLASSIC = 0x40000
 SIZE_MODERN  = 0x80000
-MAX_ROM_SIZE = SIZE_MODERN
+
+ROM_SIZES = {SIZE_BOOTROM, SIZE_590, SIZE_4091, SIZE_CLASSIC, SIZE_MODERN}
 
 def decode_cloanto(rom, key):
     """Decodes an encoded Kickstart ROM and returns a decoded ROM"""
@@ -22,7 +26,8 @@ def decode_cloanto(rom, key):
         key_index = (key_index + 1) % key_size
 
     return result
-        
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Cloanto Decoder 1.0")
     parser.add_argument('romfile')
@@ -38,7 +43,7 @@ if __name__ == '__main__':
         if file_id == CLOANTO_ID:
             data = infile.read()            
             size = len(data)
-            if size != SIZE_CLASSIC and size != SIZE_MODERN:
+            if size not in ROM_SIZES:
                 raise Exception("invalid rom size")
             decoded = decode_cloanto(data, key_data)
             with open(args.target, 'wb') as outfile:
