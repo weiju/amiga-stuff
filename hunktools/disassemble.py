@@ -42,7 +42,7 @@ class IntConstant:
         self.value = value
 
     def __repr__(self):
-        return '#%d' % self.value
+        return '#%02x' % self.value
 
 
 class DataRegister:
@@ -91,7 +91,7 @@ class AddressRegisterIndirectDisplacement:
         self.displacement = displacement
 
     def __repr__(self):
-        return '%d(a%d)' % (self.displacement, self.regnum)
+        return '%02x(a%d)' % (self.displacement, self.regnum)
 
 
 class AddressRegisterIndirectDisplacementIndex:
@@ -101,7 +101,7 @@ class AddressRegisterIndirectDisplacementIndex:
         self.index = iindex
 
     def __repr__(self):
-        return '(%d,a%d,%d)' % (self.displacement, self.regnum, self.index)
+        return '(%02x,a%d,%02x)' % (self.displacement, self.regnum, self.index)
 
 
 ######################################################################
@@ -150,9 +150,10 @@ class Operation1(Opcode):
 
 
 class Jump(Opcode):
-    def __init__(self, name, size, displacement):
+    def __init__(self, name, pc, size, displacement):
         Opcode.__init__(self, name, size)
         self.displacement = displacement
+        self.pc = pc
 
     def is_branch(self):
         return True
@@ -167,7 +168,18 @@ class Jump(Opcode):
         return self.name.startswith('b')
 
     def __repr__(self):
-        return "%s\t%s" % (self.name, self.displacement)
+        # TODO: branches currently are displayed using their offset
+        # and not their destination
+        # jump locations are defined correctly
+        # To adjust the branch destination, we need to actually
+        # add the displacement to the address after the instruction
+        if self.is_local_branch():
+            if self.size == 2:
+                return "%s.s\t%x" % (self.name, self.pc + self.size + self.displacement)
+            else:
+                return "%s\t%x" % (self.name, self.pc + self.size + self.displacement)
+        else:
+            return "%s\t%s" % (self.name, self.displacement)
 
 
 def is_move(category):
@@ -205,10 +217,10 @@ def operand(size, mode_bits, reg_bits, data, offset, skip=0):
             result = IntConstant(imm_value)
         elif mode in {'(xxx).L', '(xxx).W'}:  # absolute
             addr, added = next_word(mode[-1], data, offset + 2 + skip)
-            result = "%d.%s" % (addr, mode[-1])
+            result = "%02x.%s" % (addr, mode[-1])
         elif mode == '(d16,PC)':
             disp16, added = next_word('W', data, offset + 2 + skip)
-            result = "%d(PC)" % disp16
+            result = "%02x(PC)" % disp16
         else:
             raise Exception("unsupported ext mode: '%s'" % mode)
     elif mode == '(d16,An)':
@@ -231,7 +243,7 @@ def operand(size, mode_bits, reg_bits, data, offset, skip=0):
     else:
         raise Exception('unsupported mode: ', mode)
     return result, added
-    
+
 
 def disassemble_move(bits, data, offset):
     category = OPCODE_CATEGORIES[bits[0:4]]
@@ -277,7 +289,7 @@ def disassemble_misc(bits, data, offset):
         return Operation2('lea', added + 2, ea, AddressRegister(regnum))
     elif bits.startswith('0100111010'):  # jsr
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
-        return Jump('jsr', added + 2, ea)
+        return Jump('jsr', offset, added + 2, ea)
     elif bits.startswith('0100111011'):  # jmp
         ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
         return Jump('jmp', added + 2, ea)
@@ -327,14 +339,14 @@ def _disassemble(data, offset):
     elif category == 'bcc_bsr_bra':
         if bits[0:8] == '01100000':  # bra
             disp, added = branch_displacement(bits, data, offset)
-            instr = Jump('bra', added + 2, disp)
+            instr = Jump('bra', offset, added + 2, disp)
         elif bits[0:8] == '01100001':  # bsr
             disp, added = branch_displacement(bits, data, offset)
-            instr = Jump('bsr', added + 2, disp)
+            instr = Jump('bsr', offset, added + 2, disp)
         else:
             cond = CONDITION_CODES[int(bits[4:8], 2)]
             disp, added = branch_displacement(bits, data, offset)
-            instr = Jump('b%s' % cond, added + 2, disp)
+            instr = Jump('b%s' % cond, offset, added + 2, disp)
     elif category == 'addq_subq':
         if bits[7] == '0':  # addq
             ea, added = operand('l', bits[10:13], bits[13:16], data, offset)
@@ -406,14 +418,17 @@ def disassemble(code):
         if instr.is_return():
             continue  # we can't assume any valid code to come after a return
 
+        # enqueue the address after the instruction
         if not instr.is_absolute_branch():
             new_dest = offset + instr.size
             if new_dest < len(code) and new_dest not in seen:
                 reachable.append(new_dest)
 
-        # following jumps and branches is non-trivial
-        # the problem is that we need to be able to tell local
-        # from global branches
+        # following jumps and branches is non-trivial the problem is that we need to be
+        # able to tell local from global branches. For now, only branch instructions
+        # are recognized as local branches.
+        # TODO: jumps can be local as well, if the destination is to a relocatable
+        # address, we need to include that information, too
         if instr.is_local_branch():
             # note that the branch target is computed based on the address after the
             # 16 bit opcode, ignoring additional extension words in the displacement
