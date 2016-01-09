@@ -202,7 +202,7 @@ void parse_file(const char *path)
       read_chunks(fp, filesize, total_read);
     } else {
       puts("not an IFF ILBM file");
-    }    
+    }
   } else {
     puts("not an IFF file");
   }

@@ -50,40 +50,40 @@
 #define QUIT_MENU_ITEM_NUM  1
 
 struct NewWindow newwin = {
-  WIN_LEFT, WIN_TOP, WIN_WIDTH, WIN_HEIGHT, 0, 1,
-  IDCMP_CLOSEWINDOW | IDCMP_MENUPICK | IDCMP_GADGETUP,
-  WINDOWCLOSE | SMART_REFRESH | ACTIVATE | WINDOWSIZING | WINDOWDRAG | WINDOWDEPTH | NOCAREREFRESH,
-  NULL, NULL, WIN_TITLE,
-  NULL, NULL,
-  WIN_MIN_WIDTH, WIN_MIN_HEIGHT,
-  WIN_MAX_WIDTH, WIN_MAX_HEIGHT,
-  WBENCHSCREEN
+    WIN_LEFT, WIN_TOP, WIN_WIDTH, WIN_HEIGHT, 0, 1,
+    IDCMP_CLOSEWINDOW | IDCMP_MENUPICK | IDCMP_GADGETUP,
+    WINDOWCLOSE | SMART_REFRESH | ACTIVATE | WINDOWSIZING | WINDOWDRAG | WINDOWDEPTH | NOCAREREFRESH,
+    NULL, NULL, WIN_TITLE,
+    NULL, NULL,
+    WIN_MIN_WIDTH, WIN_MIN_HEIGHT,
+    WIN_MAX_WIDTH, WIN_MAX_HEIGHT,
+    WBENCHSCREEN
 };
 
 struct IntuiText menutext[] = {
-  {0, 1, JAM2, 0, 1, NULL, "Open...", NULL},
-  {0, 1, JAM2, 0, 1, NULL, "Quit", NULL}
+    {0, 1, JAM2, 0, 1, NULL, "Open...", NULL},
+    {0, 1, JAM2, 0, 1, NULL, "Quit", NULL}
 };
 
 struct MenuItem fileMenuItems[] = {
-  {&fileMenuItems[1], 0, 0, 0, 0, ITEMTEXT | ITEMENABLED | HIGHCOMP | COMMSEQ, 0,
-   &menutext[0], NULL, 'O', NULL, 0},
-  {NULL, 0, 0, 0, 0, ITEMTEXT | ITEMENABLED | HIGHCOMP | COMMSEQ, 0,
-   &menutext[1], NULL, 'Q', NULL, 0}
+    {&fileMenuItems[1], 0, 0, 0, 0, ITEMTEXT | ITEMENABLED | HIGHCOMP | COMMSEQ, 0,
+     &menutext[0], NULL, 'O', NULL, 0},
+    {NULL, 0, 0, 0, 0, ITEMTEXT | ITEMENABLED | HIGHCOMP | COMMSEQ, 0,
+     &menutext[1], NULL, 'Q', NULL, 0}
 };
 
 struct Menu menus[] = {
-  {NULL, 20, 0, 0, 0, MENUENABLED | MIDRAWN, "File", &fileMenuItems[0], 0, 0, 0, 0}
+    {NULL, 20, 0, 0, 0, MENUENABLED | MIDRAWN, "File", &fileMenuItems[0], 0, 0, 0, 0}
 };
 
 struct Window *window;
 
 void cleanup()
 {
-  if (window) {
-    ClearMenuStrip(window);
-    CloseWindow(window);
-  }
+    if (window) {
+        ClearMenuStrip(window);
+        CloseWindow(window);
+    }
 }
 
 #define REQ_WIDTH 180
@@ -100,67 +100,66 @@ void cleanup()
 
 #define PATH_GADGET_WIDTH 160
 
-
 /*
  * This opens a very rudimentary file dialog, that demonstrates a true requester, which
  * is dependent on the parent window.
  */
 void open_file()
 {
-  /* Note that all data here is static.
-   The reason is that Intuition expects the data to still exist for the lifetime of the
-   requester. If it's gone, the Guru will greet you.
-  */
-  static struct Requester requester;
-  static WORD req_border_points[] = {
-    0, 0, REQ_WIDTH - 1, 0, REQ_WIDTH - 1, REQ_HEIGHT - 1, 0, REQ_HEIGHT - 1, 0, 0
-  };
-  static struct Border req_border = {0, 0, 1, 0, JAM1, 5, req_border_points, NULL};
+    /* Note that all data here is static.
+       The reason is that Intuition expects the data to still exist for the lifetime of the
+       requester. If it's gone, the Guru will greet you.
+    */
+    static struct Requester requester;
+    static WORD req_border_points[] = {
+        0, 0, REQ_WIDTH - 1, 0, REQ_WIDTH - 1, REQ_HEIGHT - 1, 0, REQ_HEIGHT - 1, 0, 0
+    };
+    static struct Border req_border = {0, 0, 1, 0, JAM1, 5, req_border_points, NULL};
 
-  static struct IntuiText labels[] = {
-    {1, 0, JAM2, REQ_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Enter file path", NULL},
-    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Ok", NULL},
-    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Cancel", NULL}
-  };
-  static WORD gadget_border_points[3][10] = {
-    {0, 0, OK_BUTTON_WIDTH, 0, OK_BUTTON_WIDTH, BUTTON_HEIGHT, 0, BUTTON_HEIGHT, 0, 0},
-    {0, 0, CANCEL_BUTTON_WIDTH, 0, CANCEL_BUTTON_WIDTH, BUTTON_HEIGHT, 0, BUTTON_HEIGHT, 0, 0},
-    {-2, -2, PATH_GADGET_WIDTH, -2, PATH_GADGET_WIDTH, 10, -2, 10, -2, -2}
-  };
-  static struct Border gadget_borders[] = {
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[0], NULL},
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[1], NULL},
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[2], NULL}
-  };
-  static UBYTE buffer[81], undobuffer[81];
-  static struct StringInfo strinfo = {buffer, undobuffer, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
+    static struct IntuiText labels[] = {
+        {1, 0, JAM2, REQ_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Enter file path", NULL},
+        {1, 0, JAM2, BUTTON_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Ok", NULL},
+        {1, 0, JAM2, BUTTON_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Cancel", NULL}
+    };
+    static WORD gadget_border_points[3][10] = {
+        {0, 0, OK_BUTTON_WIDTH, 0, OK_BUTTON_WIDTH, BUTTON_HEIGHT, 0, BUTTON_HEIGHT, 0, 0},
+        {0, 0, CANCEL_BUTTON_WIDTH, 0, CANCEL_BUTTON_WIDTH, BUTTON_HEIGHT, 0, BUTTON_HEIGHT, 0, 0},
+        {-2, -2, PATH_GADGET_WIDTH, -2, PATH_GADGET_WIDTH, 10, -2, 10, -2, -2}
+    };
+    static struct Border gadget_borders[] = {
+        {0, 0, 1, 0, JAM1, 5, gadget_border_points[0], NULL},
+        {0, 0, 1, 0, JAM1, 5, gadget_border_points[1], NULL},
+        {0, 0, 1, 0, JAM1, 5, gadget_border_points[2], NULL}
+    };
+    static UBYTE buffer[81], undobuffer[81];
+    static struct StringInfo strinfo = {buffer, undobuffer, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
 
-  static struct Gadget gadgets[] = {
-    {&gadgets[1], OK_BUTTON_X, OK_BUTTON_Y, OK_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
-     GACT_RELVERIFY | GACT_ENDGADGET, GTYP_BOOLGADGET | GTYP_REQGADGET,
-     &gadget_borders[0], NULL, &labels[1], 0, NULL, 101, NULL},
-    {&gadgets[2], CANCEL_BUTTON_X, CANCEL_BUTTON_Y, CANCEL_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
-     GACT_RELVERIFY | GACT_ENDGADGET, GTYP_BOOLGADGET | GTYP_REQGADGET,
-     &gadget_borders[1], NULL, &labels[2], 0, NULL, 102, NULL},
-    {NULL, OK_BUTTON_X, 20, PATH_GADGET_WIDTH, 10,
-     GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &gadget_borders[2], NULL, &labels[3],
-     0, &strinfo, 103, NULL},
-  };
+    static struct Gadget gadgets[] = {
+        {&gadgets[1], OK_BUTTON_X, OK_BUTTON_Y, OK_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
+         GACT_RELVERIFY | GACT_ENDGADGET, GTYP_BOOLGADGET | GTYP_REQGADGET,
+         &gadget_borders[0], NULL, &labels[1], 0, NULL, 101, NULL},
+        {&gadgets[2], CANCEL_BUTTON_X, CANCEL_BUTTON_Y, CANCEL_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
+         GACT_RELVERIFY | GACT_ENDGADGET, GTYP_BOOLGADGET | GTYP_REQGADGET,
+         &gadget_borders[1], NULL, &labels[2], 0, NULL, 102, NULL},
+        {NULL, OK_BUTTON_X, 20, PATH_GADGET_WIDTH, 10,
+         GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &gadget_borders[2], NULL, &labels[3],
+         0, &strinfo, 103, NULL},
+    };
 
-  BOOL result;
-  InitRequester(&requester);
-  requester.LeftEdge = 50;
-  requester.TopEdge = 50;
-  requester.Width = REQ_WIDTH;
-  requester.Height = REQ_HEIGHT;
-  requester.Flags = 0;
-  requester.BackFill = 0;
-  requester.ReqGadget = &gadgets[0];
-  requester.ReqBorder = &req_border;
-  requester.ReqText = &labels[0];
-  result = Request(&requester, window);
-  if (result) puts("Requester could be opened");
-  else puts("Requester could not be opened");
+    BOOL result;
+    InitRequester(&requester);
+    requester.LeftEdge = 50;
+    requester.TopEdge = 50;
+    requester.Width = REQ_WIDTH;
+    requester.Height = REQ_HEIGHT;
+    requester.Flags = 0;
+    requester.BackFill = 0;
+    requester.ReqGadget = &gadgets[0];
+    requester.ReqBorder = &req_border;
+    requester.ReqText = &labels[0];
+    result = Request(&requester, window);
+    if (result) puts("Requester could be opened");
+    else puts("Requester could not be opened");
 }
 
 BOOL handle_menu(UWORD menuNum, UWORD itemNum, UWORD subItemNum)
@@ -279,68 +278,68 @@ void setup_menu()
 
 struct Gadget *setup_gadgets()
 {
-  static struct IntuiText gadget_labels[] = {
-    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Click me !", NULL},
-    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Click me too !", NULL},
-    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, SLIDER_LABEL_YOFFSET, NULL, "A slider", NULL},
-    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, STRING_LABEL_YOFFSET, NULL, "A string gadget", NULL},
-    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, STRING_LABEL_YOFFSET, NULL, "An integer gadget", NULL}
-  };
-  static WORD gadget_border_points[3][10] = {
-    {0, 0, CLICKME_BUTTON_WIDTH, 0, CLICKME_BUTTON_WIDTH, BUTTON_HEIGHT,
-     0, BUTTON_HEIGHT, 0, 0},
-    {0, 0, CLICKME2_BUTTON_WIDTH, 0, CLICKME2_BUTTON_WIDTH, BUTTON_HEIGHT,
-     0, BUTTON_HEIGHT, 0, 0},
-    {STRING_BORDER_X, STRING_BORDER_Y, STRING_WIDTH, STRING_BORDER_Y,
-     STRING_WIDTH, STRING_HEIGHT, STRING_BORDER_X, STRING_HEIGHT,
-     STRING_BORDER_X, STRING_BORDER_Y}
-  };
-  static struct Border gadget_border[] = {
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[0], NULL},
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[1], NULL},
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[2], NULL}
-  };
-  static struct PropInfo propinfos[] = {
-    {AUTOKNOB | FREEHORIZ, 0, 0, 10, MAXBODY, 0, 0, 0, 0, 0, 0}
-  };
-  static struct Image slider_image;
-  static UBYTE buffer[11], undobuffer[11], buffer2[11], undobuffer2[11];
-  static struct StringInfo strinfos[] = {
-    {buffer, undobuffer, 0, 10, 0, 0, 0, 0, 0, 0, NULL, 0, NULL},
-    {buffer2, undobuffer2, 0, 10, 0, 0, 0, 0, 0, 0, NULL, 0, NULL}
-  };
-  static struct Gadget gadgets[] = {
-    {&gadgets[1], CLICKME_BUTTON_X, CLICKME_BUTTON_Y, CLICKME_BUTTON_WIDTH, BUTTON_HEIGHT,
-     GFLG_GADGHBOX, GACT_RELVERIFY, GTYP_BOOLGADGET, &gadget_border[0], NULL, &gadget_labels[0],
-     0, NULL, 1, NULL},
-    {&gadgets[2], CLICKME2_BUTTON_X, CLICKME2_BUTTON_Y, CLICKME2_BUTTON_WIDTH, BUTTON_HEIGHT,
-     GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_BOOLGADGET, &gadget_border[1], NULL, &gadget_labels[1],
-     0, NULL, 2, NULL},
-    {&gadgets[3], SLIDER_X, SLIDER_Y, SLIDER_WIDTH, SLIDER_HEIGHT,
-     GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_PROPGADGET, &slider_image, NULL, &gadget_labels[2],
-     0, &propinfos[0], 3, NULL},
-    {&gadgets[4], STRING_X, STRING_Y, STRING_WIDTH, STRING_HEIGHT,
-     GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &gadget_border[2], NULL, &gadget_labels[3],
-     0, &strinfos[0], 3, NULL},
-    {NULL, INTEGER_X, INTEGER_Y, INTEGER_WIDTH, INTEGER_HEIGHT,
-     GFLG_GADGHCOMP, GACT_LONGINT, GTYP_STRGADGET, &gadget_border[2], NULL, &gadget_labels[4],
-     0, &strinfos[1], 3, NULL},
-  };
-  buffer[0] = 0;
-  undobuffer[0] = 0;
-  buffer2[0] = 0;
-  undobuffer2[0] = 0;
-  strcpy(buffer2, "0");
-  return &gadgets[0];
+    static struct IntuiText gadget_labels[] = {
+        {1, 0, JAM2, BUTTON_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Click me !", NULL},
+        {1, 0, JAM2, BUTTON_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Click me too !", NULL},
+        {1, 0, JAM2, BUTTON_TEXT_XOFFSET, SLIDER_LABEL_YOFFSET, NULL, "A slider", NULL},
+        {1, 0, JAM2, BUTTON_TEXT_XOFFSET, STRING_LABEL_YOFFSET, NULL, "A string gadget", NULL},
+        {1, 0, JAM2, BUTTON_TEXT_XOFFSET, STRING_LABEL_YOFFSET, NULL, "An integer gadget", NULL}
+    };
+    static WORD gadget_border_points[3][10] = {
+        {0, 0, CLICKME_BUTTON_WIDTH, 0, CLICKME_BUTTON_WIDTH, BUTTON_HEIGHT,
+         0, BUTTON_HEIGHT, 0, 0},
+        {0, 0, CLICKME2_BUTTON_WIDTH, 0, CLICKME2_BUTTON_WIDTH, BUTTON_HEIGHT,
+         0, BUTTON_HEIGHT, 0, 0},
+        {STRING_BORDER_X, STRING_BORDER_Y, STRING_WIDTH, STRING_BORDER_Y,
+         STRING_WIDTH, STRING_HEIGHT, STRING_BORDER_X, STRING_HEIGHT,
+         STRING_BORDER_X, STRING_BORDER_Y}
+    };
+    static struct Border gadget_border[] = {
+        {0, 0, 1, 0, JAM1, 5, gadget_border_points[0], NULL},
+        {0, 0, 1, 0, JAM1, 5, gadget_border_points[1], NULL},
+        {0, 0, 1, 0, JAM1, 5, gadget_border_points[2], NULL}
+    };
+    static struct PropInfo propinfos[] = {
+        {AUTOKNOB | FREEHORIZ, 0, 0, 10, MAXBODY, 0, 0, 0, 0, 0, 0}
+    };
+    static struct Image slider_image;
+    static UBYTE buffer[11], undobuffer[11], buffer2[11], undobuffer2[11];
+    static struct StringInfo strinfos[] = {
+        {buffer, undobuffer, 0, 10, 0, 0, 0, 0, 0, 0, NULL, 0, NULL},
+        {buffer2, undobuffer2, 0, 10, 0, 0, 0, 0, 0, 0, NULL, 0, NULL}
+    };
+    static struct Gadget gadgets[] = {
+        {&gadgets[1], CLICKME_BUTTON_X, CLICKME_BUTTON_Y, CLICKME_BUTTON_WIDTH, BUTTON_HEIGHT,
+         GFLG_GADGHBOX, GACT_RELVERIFY, GTYP_BOOLGADGET, &gadget_border[0], NULL, &gadget_labels[0],
+         0, NULL, 1, NULL},
+        {&gadgets[2], CLICKME2_BUTTON_X, CLICKME2_BUTTON_Y, CLICKME2_BUTTON_WIDTH, BUTTON_HEIGHT,
+         GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_BOOLGADGET, &gadget_border[1], NULL, &gadget_labels[1],
+         0, NULL, 2, NULL},
+        {&gadgets[3], SLIDER_X, SLIDER_Y, SLIDER_WIDTH, SLIDER_HEIGHT,
+         GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_PROPGADGET, &slider_image, NULL, &gadget_labels[2],
+         0, &propinfos[0], 3, NULL},
+        {&gadgets[4], STRING_X, STRING_Y, STRING_WIDTH, STRING_HEIGHT,
+         GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &gadget_border[2], NULL, &gadget_labels[3],
+         0, &strinfos[0], 3, NULL},
+        {NULL, INTEGER_X, INTEGER_Y, INTEGER_WIDTH, INTEGER_HEIGHT,
+         GFLG_GADGHCOMP, GACT_LONGINT, GTYP_STRGADGET, &gadget_border[2], NULL, &gadget_labels[4],
+         0, &strinfos[1], 3, NULL},
+    };
+    buffer[0] = 0;
+    undobuffer[0] = 0;
+    buffer2[0] = 0;
+    undobuffer2[0] = 0;
+    strcpy(buffer2, "0");
+    return &gadgets[0];
 }
 
 int main(int argc, char **argv)
 {
-  newwin.FirstGadget = setup_gadgets();
-  if (window = OpenWindow(&newwin)) {
-    setup_menu();
-    handle_events();
-  }
-  cleanup();
-  return 1;
+    newwin.FirstGadget = setup_gadgets();
+    if (window = OpenWindow(&newwin)) {
+        setup_menu();
+        handle_events();
+    }
+    cleanup();
+    return 1;
 }

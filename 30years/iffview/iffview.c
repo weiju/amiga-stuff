@@ -28,6 +28,7 @@
 #ifdef __VBCC__
 #include <clib/alib_stdio_protos.h>
 #endif
+#include "filereq.h"
 
 #define WIN_LEFT       10
 #define WIN_TOP        10
@@ -47,7 +48,7 @@
 
 struct NewWindow newwin = {
   WIN_LEFT, WIN_TOP, WIN_WIDTH, WIN_HEIGHT, 0, 1,
-  IDCMP_CLOSEWINDOW | IDCMP_MENUPICK,
+  IDCMP_CLOSEWINDOW | IDCMP_MENUPICK | IDCMP_GADGETUP | IDCMP_REQCLEAR,
   WINDOWCLOSE | SMART_REFRESH | ACTIVATE | WINDOWSIZING | WINDOWDRAG | WINDOWDEPTH | NOCAREREFRESH,
   NULL, NULL, WIN_TITLE,
   NULL, NULL,
@@ -83,126 +84,96 @@ void cleanup()
 }
 
 
-#define OK_BUTTON_WIDTH  40
-#define OK_BUTTON_HEIGHT 24
-#define REQ_WIDTH 200
-#define REQ_HEIGHT 100
-#define TOPAZ_BASELINE 8
-
-void open_file()
-{
-  struct Requester requester;
-  struct IntuiText button_text = {1, 0, JAM2, 0, TOPAZ_BASELINE, NULL, "Ok", NULL};
-  WORD button_border_points[] = {
-    0, 0, OK_BUTTON_WIDTH, 0, OK_BUTTON_WIDTH, OK_BUTTON_HEIGHT, 0, OK_BUTTON_HEIGHT, 0, 0
-  };
-  struct Border button_border = {0, 0, 1, 0, JAM1, 5, button_border_points, NULL};
-
-  WORD req_border_points[] = {
-    0, 0, REQ_WIDTH, 0, REQ_WIDTH, REQ_HEIGHT, 0, REQ_HEIGHT, 0, 0
-  };
-  struct Border req_border = {0, 0, 1, 0, JAM1, 5, req_border_points, NULL};
-  BOOL result;
-
-  struct Gadget button1 = {
-    NULL, 10, 10, OK_BUTTON_WIDTH, OK_BUTTON_HEIGHT,
-    GFLG_GADGHCOMP, 0, GTYP_BOOLGADGET | GTYP_REQGADGET,
-    &button_border, NULL, &button_text,
-    0, NULL, 0, NULL
-  };
-  InitRequester(&requester);
-  requester.LeftEdge = 20;
-  requester.TopEdge = 20;
-  requester.Width = REQ_WIDTH;
-  requester.Height = REQ_HEIGHT;
-  requester.Flags = 0;
-  requester.BackFill = 0;
-  requester.ReqGadget = &button1;
-  requester.ReqBorder = &req_border;
-  result = Request(&requester, window);
-  if (result) puts("Requester could be opened");
-  else puts("Requester could not be opened");
-}
+struct Requester *filereq;
 
 BOOL handle_menu(UWORD menuNum, UWORD itemNum, UWORD subItemNum)
 {
-  printf("menu, menu num: %d, item num: %d, sub item num: %d\n",
-         (int) menuNum, (int) itemNum, (int) subItemNum);
-  if (menuNum == FILE_MENU_NUM && itemNum == QUIT_MENU_ITEM_NUM) {
-    /* quit */
-    return TRUE;
-  }
-  if (menuNum == FILE_MENU_NUM && itemNum == OPEN_MENU_ITEM_NUM) {
-    open_file();
-  }
-  return FALSE;
+    printf("menu, menu num: %d, item num: %d, sub item num: %d\n",
+           (int) menuNum, (int) itemNum, (int) subItemNum);
+    if (menuNum == FILE_MENU_NUM && itemNum == QUIT_MENU_ITEM_NUM) {
+        /* quit */
+        return TRUE;
+    }
+    if (menuNum == FILE_MENU_NUM && itemNum == OPEN_MENU_ITEM_NUM) {
+        filereq = open_file(window);
+    }
+    return FALSE;
 }
 
-void handle_events() {
-  BOOL done = FALSE;
-  struct IntuiMessage *msg;
-  ULONG msgClass;
-  UWORD menuCode;
+void handle_events()
+{
+    BOOL done = FALSE;
+    struct IntuiMessage *msg;
+    ULONG msgClass;
+    UWORD menuCode;
+    int buttonId;
 
-  while (!done) {
-    Wait(1 << window->UserPort->mp_SigBit);
-    if (msg = (struct IntuiMessage *) GetMsg(window->UserPort)) {
-      msgClass = msg->Class;
-      switch (msgClass) {
-      case IDCMP_CLOSEWINDOW:
-        done = TRUE;
-        break;
-      case IDCMP_MENUPICK:
-        menuCode = msg->Code;
-        done = handle_menu(MENUNUM(menuCode), ITEMNUM(menuCode), SUBNUM(menuCode));
-        break;
-      default:
-        break;
-      }
-      ReplyMsg((struct Message *) msg);
+    while (!done) {
+        Wait(1 << window->UserPort->mp_SigBit);
+        if (msg = (struct IntuiMessage *) GetMsg(window->UserPort)) {
+            msgClass = msg->Class;
+            switch (msgClass) {
+            case IDCMP_CLOSEWINDOW:
+                done = TRUE;
+                break;
+            case IDCMP_MENUPICK:
+                menuCode = msg->Code;
+                done = handle_menu(MENUNUM(menuCode), ITEMNUM(menuCode), SUBNUM(menuCode));
+                break;
+            case IDCMP_GADGETUP:
+                buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
+                if (buttonId == REQ_OK_BUTTON_ID && filereq) EndRequest(filereq, window);
+                break;
+            case IDCMP_REQCLEAR:
+                puts("requester closed");
+                break;
+            default:
+                break;
+            }
+            ReplyMsg((struct Message *) msg);
+        }
     }
-  }
 }
 
 void setup_menu()
 {
-  UWORD txWidth, txHeight, txBaseline, txSpacing, itemWidth, itemHeight, numItems;
-  struct RastPort *rp = &window->WScreen->RastPort;
-  int i;
+    UWORD txWidth, txHeight, txBaseline, txSpacing, itemWidth, itemHeight, numItems;
+    struct RastPort *rp = &window->WScreen->RastPort;
+    int i;
 
-  txWidth = rp->TxWidth;
-  txHeight = rp->TxHeight;
-  txBaseline = rp->TxBaseline;
-  txSpacing = rp->TxSpacing;
-  printf("TxWidth: %d, TxHeight: %d, TxBaseline: %d, TxSpacing: %d\n",
-         (int) txWidth, (int) txHeight, (int) txBaseline, (int) txSpacing);
+    txWidth = rp->TxWidth;
+    txHeight = rp->TxHeight;
+    txBaseline = rp->TxBaseline;
+    txSpacing = rp->TxSpacing;
+    printf("TxWidth: %d, TxHeight: %d, TxBaseline: %d, TxSpacing: %d\n",
+           (int) txWidth, (int) txHeight, (int) txBaseline, (int) txSpacing);
 
-  /* Set file menu bounds */
-  menus[0].Width = TextLength(rp, "File", strlen("File")) + txWidth;
-  menus[0].Height = txHeight;
+    /* Set file menu bounds */
+    menus[0].Width = TextLength(rp, "File", strlen("File")) + txWidth;
+    menus[0].Height = txHeight;
 
-  /* Set file menu items bounds */
-  /* We actually need to know what the command uses up */
-  itemWidth = txWidth * strlen("Open...") + 50;
-  itemHeight = txHeight + 2;  /* 2 pixels adjustment */
+    /* Set file menu items bounds */
+    /* We actually need to know what the command uses up */
+    itemWidth = txWidth * strlen("Open...") + 50;
+    itemHeight = txHeight + 2;  /* 2 pixels adjustment */
 
-  numItems = sizeof(fileMenuItems) / sizeof(struct MenuItem);
-  printf("# file items: %d\n", (int) numItems);
-  for (i = 0; i < numItems; i++) {
-    fileMenuItems[i].TopEdge = i * itemHeight;
-    fileMenuItems[i].Height = itemHeight;
-    fileMenuItems[i].Width = itemWidth;
-  }
+    numItems = sizeof(fileMenuItems) / sizeof(struct MenuItem);
+    printf("# file items: %d\n", (int) numItems);
+    for (i = 0; i < numItems; i++) {
+        fileMenuItems[i].TopEdge = i * itemHeight;
+        fileMenuItems[i].Height = itemHeight;
+        fileMenuItems[i].Width = itemWidth;
+    }
 
-  SetMenuStrip(window, &menus[0]);
+    SetMenuStrip(window, &menus[0]);
 }
 
 int main(int argc, char **argv)
 {
-  if (window = OpenWindow(&newwin)) {
-    setup_menu();
-    handle_events();
-  }
-  cleanup();
-  return 1;
+    if (window = OpenWindow(&newwin)) {
+        setup_menu();
+        handle_events();
+    }
+    cleanup();
+    return 1;
 }
