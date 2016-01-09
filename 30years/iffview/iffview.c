@@ -123,6 +123,7 @@ void handle_events()
             case IDCMP_GADGETUP:
                 buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
                 if (buttonId == REQ_OK_BUTTON_ID && filereq) EndRequest(filereq, window);
+                else if (buttonId == REQ_CANCEL_BUTTON_ID && filereq) EndRequest(filereq, window);
                 break;
             case IDCMP_REQCLEAR:
                 puts("requester closed");
