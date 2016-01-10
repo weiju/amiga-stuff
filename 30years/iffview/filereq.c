@@ -1,34 +1,41 @@
 #include <intuition/intuition.h>
 #include <clib/intuition_protos.h>
+#include <clib/dos_protos.h>
 
-#ifdef __VBCC__
 #include <clib/alib_stdio_protos.h>
-#endif
 
 #include "filereq.h"
 
 #define REQ_TEXT_XOFFSET 10
-#define BUTTON_TEXT_XOFFSET 14
-#define REQ_WIDTH 200
-#define REQ_HEIGHT 100
+#define REQ_WIDTH 240
+#define REQ_HEIGHT 170
 #define TOPAZ_BASELINE 8
-#define BUTTON_HEIGHT 24
 
-#define OK_BUTTON_X  20
-#define OK_BUTTON_WIDTH  40
+#define BUTTON_Y      140
+#define BUTTON_HEIGHT 18
+
+#define BUTTON_TEXT_XOFFSET 14
+#define OK_BUTTON_X          20
+#define CANCEL_BUTTON_X      160
+#define OK_BUTTON_WIDTH      40
 #define CANCEL_BUTTON_WIDTH  60
-#define PATH_GADGET_WIDTH 100
+
+#define STR_GADGET_X  90
+#define STR_GADGET_Y  120
+#define PATH_GADGET_WIDTH    100
 
 
 struct Requester requester;
 struct IntuiText labels[] = {
-    {1, 0, JAM2, REQ_TEXT_XOFFSET, TOPAZ_BASELINE, NULL, "Enter file path", NULL},
-    {1, 0, JAM2, 10, TOPAZ_BASELINE, NULL, "Ok", NULL},
-    {1, 0, JAM2, 10, TOPAZ_BASELINE, NULL, "Cancel", NULL} /* TOPAZ_BASELINE is 8 */
+    {1, 0, JAM2, REQ_TEXT_XOFFSET, STR_GADGET_Y, NULL, "Enter file path", NULL},
+    {1, 0, JAM2, 10, TOPAZ_BASELINE - 4, NULL, "Ok", NULL},
+    {1, 0, JAM2, 10, TOPAZ_BASELINE - 4, NULL, "Cancel", NULL} /* TOPAZ_BASELINE is 8 */
 };
 WORD gadget_border_points[3][10] = {
     {0, 0, OK_BUTTON_WIDTH, 0, OK_BUTTON_WIDTH, BUTTON_HEIGHT, 0, BUTTON_HEIGHT, 0, 0},
     {0, 0, CANCEL_BUTTON_WIDTH, 0, CANCEL_BUTTON_WIDTH, BUTTON_HEIGHT, 0, BUTTON_HEIGHT, 0, 0},
+    /* the -2 is the margin to set to avoid that the string gadget will overdraw the
+     borders */
     {-2, -2, PATH_GADGET_WIDTH, -2, PATH_GADGET_WIDTH, 10, -2, 10, -2, -2}
 };
 struct Border gadget_borders[] = {
@@ -50,18 +57,32 @@ struct StringInfo strinfo = {buffer, undobuffer, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 
   IDCMP_REQCLEAR is not fired when Intuition closes the requester automatically
 */
 struct Gadget gadgets[] = {
-    {&gadgets[1], OK_BUTTON_X, 50, OK_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
+    {&gadgets[1], OK_BUTTON_X, BUTTON_Y, OK_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
      GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET, &gadget_borders[0], NULL,
      &labels[1], 0, NULL, REQ_OK_BUTTON_ID, NULL},
-    {&gadgets[2], 80, 50, CANCEL_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
+    {&gadgets[2], CANCEL_BUTTON_X, BUTTON_Y, CANCEL_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
      GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET, &gadget_borders[1], NULL,
      &labels[2], 0, NULL, REQ_CANCEL_BUTTON_ID, NULL},
-    {NULL, OK_BUTTON_X, 20, PATH_GADGET_WIDTH, 10,
+    {NULL, STR_GADGET_X, STR_GADGET_Y, PATH_GADGET_WIDTH, 10,
      GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &gadget_borders[2], NULL,
      &labels[3], 0, &strinfo, 103, NULL},
 };
 
 BOOL initialized = 0;
+#define PATHBUFFER_SIZE 32
+char dirname[PATHBUFFER_SIZE + 1];
+BPTR flock;
+LONG error;
+struct FileInfoBlock fileinfo;
+
+void print_fileinfo(struct FileInfoBlock *fileinfo)
+{
+    if (fileinfo->fib_DirEntryType > 0) {
+        printf("dir: '%s'\n", fileinfo->fib_FileName);
+    } else {
+        printf("file: '%s'\n", fileinfo->fib_FileName);
+    }
+}
 
 struct Requester *open_file(struct Window *window)
 {
@@ -77,6 +98,24 @@ struct Requester *open_file(struct Window *window)
         requester.ReqGadget = &gadgets[0];
         requester.ReqBorder = &req_border;
         requester.ReqText = &labels[0];
+
+        /* scan current directory */
+        puts("scanning directory...");
+        GetCurrentDirName(dirname, PATHBUFFER_SIZE);
+        printf("current dir: '%s'\n", dirname);
+        flock = Lock(dirname, SHARED_LOCK);
+        if (Examine(flock, &fileinfo)) {
+            while (ExNext(flock, &fileinfo)) {
+                print_fileinfo(&fileinfo);
+            }
+            error = IoErr();
+            if (error != ERROR_NO_MORE_ENTRIES) {
+                /* an error occurred */
+                puts("unknown I/O error, TODO handle");
+            }
+        }
+        UnLock(flock);
+
         initialized = 1;
     }
     result = Request(&requester, window);

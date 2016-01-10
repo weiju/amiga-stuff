@@ -130,13 +130,14 @@ UBYTE *read_BODY(FILE *fp, int datasize, BitMapHeader *bmheader)
 
 #define skip_chunk(fp, datasize) fseek(fp, datasize, SEEK_CUR)
 
-void read_chunks(FILE *fp, int filesize, int total_read)
+IFFData *read_chunks(FILE *fp, int filesize, int total_read)
 {
   char id[5], buffer[CHUNK_HEADER_SIZE];
   int i, bytes_read, datasize;
   BitMapHeader *bmheader = NULL;
   ColorRegister *colors = NULL;
   UBYTE *imgdata = NULL;
+  IFFData *result = malloc(sizeof(IFFData));
 
   while (total_read < filesize) {
 
@@ -169,17 +170,24 @@ void read_chunks(FILE *fp, int filesize, int total_read)
     }
     total_read += datasize + CHUNK_HEADER_SIZE;
   }
+  printf("total read: %d\n", total_read);
+  /*
   if (imgdata) free(imgdata);
   if (colors) free(colors);
-  if (bmheader) free(bmheader);
+  if (bmheader) free(bmheader);*/
+  result->imgdata = imgdata;
+  result->colors = colors;
+  result->bmheader = bmheader;
+  return result;
 }
 
-void parse_file(const char *path)
+IFFData *parse_file(const char *path)
 {
   FILE *fp;
   char buffer[IFF_HEADER_SIZE];
   size_t bytes_read;
   ULONG filesize, total_read  = 0;
+  IFFData *result = NULL;
 
   fp = fopen(path, "rb");
 
@@ -199,14 +207,26 @@ void parse_file(const char *path)
 #ifdef DEBUG
       printf("IFF/ILBM file, file size: %d\n", (int) filesize);
 #endif
-      read_chunks(fp, filesize, total_read);
+      result = read_chunks(fp, filesize, total_read);
     } else {
       puts("not an IFF ILBM file");
     }
   } else {
     puts("not an IFF file");
   }
+  return result;
 }
+
+void free_iffdata(IFFData *data)
+{
+    if (data) {
+        if (data->colors) free(data->colors);
+        if (data->bmheader) free(data->bmheader);
+        if (data->imgdata) free(data->imgdata);
+        free(data);
+    }
+}
+
 
 #ifdef STANDALONE
 int main(int argc, char **argv)
@@ -214,7 +234,8 @@ int main(int argc, char **argv)
   if (argc <= 1) {
     puts("usage: ilbm <image-file>");
   } else {
-    parse_file(argv[1]);
+    IFFData *data = parse_file(argv[1]);
+    free_iffdata(data);
   }
 }
 #endif

@@ -77,4 +77,12 @@ typedef struct {
   UBYTE low, high;
 } CRange;
 
+typedef struct _IFFData {
+    BitMapHeader *bmheader;
+    ColorRegister *colors;
+    UBYTE *imgdata;
+} IFFData;
+
+extern IFFData *parse_file(const char *path);
+extern void free_iffdata(IFFData *data);
 #endif /* __ILBM_H__ */
