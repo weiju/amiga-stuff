@@ -34,6 +34,9 @@
 #define LONG int32_t
 #define WORD int16_t
 #define BYTE int8_t
+typedef int BOOL;
+#define TRUE 1
+#define FALSE 0
 
 #define HAM  0x800
 #define EXTRA_HALFBRITE 0x80
@@ -77,12 +80,13 @@ typedef struct {
   UBYTE low, high;
 } CRange;
 
-typedef struct _IFFData {
+typedef struct _ILBMData {
     BitMapHeader *bmheader;
+    int num_colors, data_bytes;
     ColorRegister *colors;
     UBYTE *imgdata;
-} IFFData;
+} ILBMData;
 
-extern IFFData *parse_file(const char *path);
-extern void free_iffdata(IFFData *data);
+extern ILBMData *parse_file(const char *path);
+extern void free_ilbm_data(ILBMData *data);
 #endif /* __ILBM_H__ */

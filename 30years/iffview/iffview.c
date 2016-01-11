@@ -29,6 +29,7 @@
 #include <clib/alib_stdio_protos.h>
 #endif
 #include "filereq.h"
+#include "ilbm.h"
 
 #define WIN_LEFT       10
 #define WIN_TOP        10
@@ -169,12 +170,29 @@ void setup_menu()
     SetMenuStrip(window, &menus[0]);
 }
 
+struct Image image = { 0, 0, 0, 0, 0, NULL, 0, 0, NULL};
+
 int main(int argc, char **argv)
 {
+    ILBMData *ilbm_data = NULL;
     if (window = OpenWindow(&newwin)) {
+        int wordwidth, finalsize;
         setup_menu();
+        ilbm_data = parse_file("examples/Kickstart13.iff");
+        image.Width = ilbm_data->bmheader->w;
+        image.Height = ilbm_data->bmheader->h;
+        image.Depth = ilbm_data->bmheader->nPlanes;
+        wordwidth = (image.Width + 16) / 16;
+        finalsize = wordwidth * image.Height * image.Depth * sizeof(UWORD);
+        image.ImageData = AllocMem(finalsize, MEMF_CHIP);
+        printf("loaded size: %d, final size: %d\n", ilbm_data->data_bytes, finalsize);
+        memcpy(image.ImageData, ilbm_data->imgdata, ilbm_data->data_bytes);
+        image.PlanePick = (1 << image.Depth) - 1;
+        // Note: rastport is the entire window, including title bars
+        DrawImage(window->RPort, &image, 5, 10);
         handle_events();
     }
+    if (ilbm_data) free_ilbm_data(ilbm_data);
     cleanup();
     return 1;
 }

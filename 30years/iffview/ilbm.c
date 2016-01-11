@@ -59,13 +59,14 @@ BitMapHeader *read_BMHD(FILE *fp, int datasize)
   return header;
 }
 
-ColorRegister *read_CMAP(FILE *fp, int datasize)
+ColorRegister *read_CMAP(FILE *fp, int datasize, int *ncols)
 {
   int num_colors = datasize / 3, bytes_read;
   ColorRegister *colors;
 
   colors = malloc(datasize);
   bytes_read = fread(colors, sizeof(ColorRegister), num_colors, fp);
+  *ncols = num_colors;
   return colors;
 }
 
@@ -98,12 +99,14 @@ void read_CRNG(FILE *fp, int datasize)
 #endif
 }
 
-UBYTE *read_BODY(FILE *fp, int datasize, BitMapHeader *bmheader)
+UBYTE *read_BODY(FILE *fp, int datasize, BitMapHeader *bmheader, int *data_bytes)
 {
   ULONG bytes_read;
-  BYTE *buffer = malloc(datasize), *dst_buffer;
+  BYTE *buffer, *dst_buffer;
   int src_i = 0, dst_i = 0, dst_size;
 
+  buffer = malloc(datasize);
+  *data_bytes = datasize;
   dst_size = bmheader->w * bmheader->h * bmheader->nPlanes / 8;
   printf("target size: %d, data size: %d\n", dst_size, datasize);
   bytes_read = fread(buffer, sizeof(char), datasize, fp);
@@ -113,6 +116,7 @@ UBYTE *read_BODY(FILE *fp, int datasize, BitMapHeader *bmheader)
     int i;
     /* decompress data */
     dst_buffer = malloc(dst_size);
+    *data_bytes = dst_size;
     while (src_i < datasize) {
       b0 = buffer[src_i++];
       if (b0 >= 0) {
@@ -130,64 +134,58 @@ UBYTE *read_BODY(FILE *fp, int datasize, BitMapHeader *bmheader)
 
 #define skip_chunk(fp, datasize) fseek(fp, datasize, SEEK_CUR)
 
-IFFData *read_chunks(FILE *fp, int filesize, int total_read)
+ILBMData *read_chunks(FILE *fp, int filesize, int total_read)
 {
-  char id[5], buffer[CHUNK_HEADER_SIZE];
-  int i, bytes_read, datasize;
-  BitMapHeader *bmheader = NULL;
-  ColorRegister *colors = NULL;
-  UBYTE *imgdata = NULL;
-  IFFData *result = malloc(sizeof(IFFData));
+    // make sure that our char buffers are aligned on word boundaries
+    unsigned char buffer[CHUNK_HEADER_SIZE], id[5];
+    int i, bytes_read, datasize, imgdata_size;
+    BitMapHeader *bmheader = NULL;
+    ColorRegister *colors = NULL;
+    UBYTE *imgdata = NULL;
+    ILBMData *result = calloc(1, sizeof(ILBMData));
 
-  while (total_read < filesize) {
-
-    bytes_read = fread(buffer, sizeof(char), 8, fp);
-
-    for (i = 0; i < 4; i++) id[i] = buffer[i];
-    id[4] = 0;
-
+    while (total_read < filesize) {
+        bytes_read = fread(buffer, sizeof(char), 8, fp);
+        for (i = 0; i < 4; i++) id[i] = buffer[i];
+        id[4] = 0;
 #ifdef LITTLE_ENDIAN
-    datasize = __bswap_32(*((ULONG *) &buffer[4]));
+        datasize = __bswap_32(*((ULONG *) &buffer[4]));
 #else
-    datasize = *((ULONG *) &buffer[4]);
+        datasize = *((ULONG *) &buffer[4]);
 #endif
-
-    if (!strncmp("BMHD", buffer, 4)) bmheader = read_BMHD(fp, datasize);
-    else if (!strncmp("CMAP", buffer, 4)) colors = read_CMAP(fp, datasize);
-    else if (!strncmp("CRNG", buffer, 4)) read_CRNG(fp, datasize);
-    else if (!strncmp("CAMG", buffer, 4)) read_CAMG(fp, datasize);
-    else if (!strncmp("BODY", buffer, 4)) imgdata = read_BODY(fp, datasize, bmheader);
-    else {
+        if (!strncmp("BMHD", buffer, 4)) bmheader = read_BMHD(fp, datasize);
+        else if (!strncmp("CMAP", buffer, 4)) colors = read_CMAP(fp, datasize, &result->num_colors);
+        else if (!strncmp("CRNG", buffer, 4)) read_CRNG(fp, datasize);
+        else if (!strncmp("CAMG", buffer, 4)) read_CAMG(fp, datasize);
+        else if (!strncmp("BODY", buffer, 4)) imgdata = read_BODY(fp, datasize, bmheader, &imgdata_size);
+        else {
 #ifdef DEBUG
-      printf("WARNING - Unsupported chunk '%s', size: %d\n", id, datasize);
+            printf("WARNING - Unsupported chunk '%s', size: %d\n", id, datasize);
 #endif
-      skip_chunk(fp, datasize);
+            skip_chunk(fp, datasize);
+        }
+        /* Padding to even if necessary */
+        if (datasize % 2) {
+            fseek(fp, 1, SEEK_CUR);
+            datasize++;
+        }
+        total_read += datasize + CHUNK_HEADER_SIZE;
     }
-    /* Padding to even if necessary */
-    if (datasize % 2) {
-      fseek(fp, 1, SEEK_CUR);
-      datasize++;
-    }
-    total_read += datasize + CHUNK_HEADER_SIZE;
-  }
-  printf("total read: %d\n", total_read);
-  /*
-  if (imgdata) free(imgdata);
-  if (colors) free(colors);
-  if (bmheader) free(bmheader);*/
-  result->imgdata = imgdata;
-  result->colors = colors;
-  result->bmheader = bmheader;
-  return result;
+    printf("total read: %d\n", total_read);
+    result->imgdata = imgdata;
+    result->data_bytes = imgdata_size;
+    result->colors = colors;
+    result->bmheader = bmheader;
+    return result;
 }
 
-IFFData *parse_file(const char *path)
+ILBMData *parse_file(const char *path)
 {
   FILE *fp;
   char buffer[IFF_HEADER_SIZE];
   size_t bytes_read;
   ULONG filesize, total_read  = 0;
-  IFFData *result = NULL;
+  ILBMData *result = NULL;
 
   fp = fopen(path, "rb");
 
@@ -214,10 +212,11 @@ IFFData *parse_file(const char *path)
   } else {
     puts("not an IFF file");
   }
+  fclose(fp);
   return result;
 }
 
-void free_iffdata(IFFData *data)
+void free_ilbm_data(ILBMData *data)
 {
     if (data) {
         if (data->colors) free(data->colors);
@@ -227,15 +226,24 @@ void free_iffdata(IFFData *data)
     }
 }
 
+void print_ilbm_info(ILBMData *data)
+{
+    printf("width: %d, height: %d, # planes: %d # colors: %d\n",
+           (int) data->bmheader->w,
+           (int) data->bmheader->h,
+           (int) data->bmheader->nPlanes,
+           data->num_colors);
+}
 
 #ifdef STANDALONE
 int main(int argc, char **argv)
 {
   if (argc <= 1) {
-    puts("usage: ilbm <image-file>");
+      puts("usage: ilbm <image-file>");
   } else {
-    IFFData *data = parse_file(argv[1]);
-    free_iffdata(data);
+      ILBMData *data = parse_file(argv[1]);
+      print_ilbm_info(data);
+      free_ilbm_data(data);
   }
 }
 #endif

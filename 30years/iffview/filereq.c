@@ -69,7 +69,7 @@ struct Gadget gadgets[] = {
 };
 
 BOOL initialized = 0;
-#define PATHBUFFER_SIZE 32
+#define PATHBUFFER_SIZE 200
 char dirname[PATHBUFFER_SIZE + 1];
 BPTR flock;
 LONG error;
@@ -101,6 +101,8 @@ struct Requester *open_file(struct Window *window)
 
         /* scan current directory */
         puts("scanning directory...");
+        /*
+        // on AmigaOS 1.x, this function does not exist !!!
         GetCurrentDirName(dirname, PATHBUFFER_SIZE);
         printf("current dir: '%s'\n", dirname);
         flock = Lock(dirname, SHARED_LOCK);
@@ -110,11 +112,11 @@ struct Requester *open_file(struct Window *window)
             }
             error = IoErr();
             if (error != ERROR_NO_MORE_ENTRIES) {
-                /* an error occurred */
                 puts("unknown I/O error, TODO handle");
             }
         }
         UnLock(flock);
+        */
 
         initialized = 1;
     }
