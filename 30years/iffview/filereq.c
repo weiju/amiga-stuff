@@ -100,6 +100,12 @@ struct Requester *open_file(struct Window *window)
         requester.ReqText = &labels[0];
 
         /* scan current directory */
+        /*
+          on AmigaOS versions before 36 (essentially all 1.x versions), the
+          function GetCurrentDirName() does not exist, but it's obtainable
+          by calling Cli() and querying the returned CommandLineInterface
+          structure
+         */
         puts("scanning directory...");
         /*
         // on AmigaOS 1.x, this function does not exist !!!

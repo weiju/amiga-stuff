@@ -172,22 +172,32 @@ void setup_menu()
 
 struct Image image = { 0, 0, 0, 0, 0, NULL, 0, 0, NULL};
 
+/* Defined automatically in VBCC */
+extern struct Library *DOSBase;
+
 int main(int argc, char **argv)
 {
+    /* version: e.g. 34, revision e.g. 3 for Kickstart 1.3 */
+    printf("DOS, version: %d, revision: %d\n",
+           (int) DOSBase->lib_Version, (int) DOSBase->lib_Revision);
     ILBMData *ilbm_data = NULL;
     if (window = OpenWindow(&newwin)) {
-        int wordwidth, finalsize;
         setup_menu();
         ilbm_data = parse_file("examples/Kickstart13.iff");
         image.Width = ilbm_data->bmheader->w;
         image.Height = ilbm_data->bmheader->h;
         image.Depth = ilbm_data->bmheader->nPlanes;
-        wordwidth = (image.Width + 16) / 16;
-        finalsize = wordwidth * image.Height * image.Depth * sizeof(UWORD);
-        image.ImageData = AllocMem(finalsize, MEMF_CHIP);
-        printf("loaded size: %d, final size: %d\n", ilbm_data->data_bytes, finalsize);
-        memcpy(image.ImageData, ilbm_data->imgdata, ilbm_data->data_bytes);
+        int wordwidth = (image.Width + 16) / 16;
+        int finalsize = wordwidth * image.Height * image.Depth * sizeof(UWORD);
+        image.ImageData = AllocMem(finalsize, MEMF_CHIP|MEMF_CLEAR);
+        ilbm_to_image_data((char *) image.ImageData, ilbm_data, wordwidth * 16, image.Height);
         image.PlanePick = (1 << image.Depth) - 1;
+        /*
+           Note that the image width  is now set to the data's image width.
+           Displayed correctly now.
+         */
+        image.Width = wordwidth * 16;
+
         // Note: rastport is the entire window, including title bars
         DrawImage(window->RPort, &image, 5, 10);
         handle_events();

@@ -196,8 +196,10 @@ ILBMData *parse_file(const char *path)
   if (!strncmp("FORM", buffer, 4)) {
 
 #ifdef LITTLE_ENDIAN
+    puts("little endian");
     filesize = __bswap_32(*((ULONG *) &buffer[4])) + CHUNK_HEADER_SIZE;
 #else
+    puts("big endian");
     filesize = *((ULONG *) &buffer[4]) + CHUNK_HEADER_SIZE;
 #endif
 
@@ -235,6 +237,46 @@ void print_ilbm_info(ILBMData *data)
            data->num_colors);
 }
 
+/*
+ * ILBM interleaved bit maps -> Intuition Image data
+ * ILBM is interleaved
+ *   - plane 0/row 0 -> plane 1/row 0 -> ... plane 0/row 1 -> plane 1/row 1 ->...
+ *   - rows are multiples of 8
+ *
+ * but Intuition Image expects its data
+ *   - plane-by-plane
+ *   - as a multiple of 16
+ */
+void ilbm_to_image_data(char *dest, ILBMData *data, int dest_width, int dest_height)
+{
+    if (data->bmheader->w % 8 != 0) {
+        puts("ERROR: source width must be multiple of 8");
+        return;
+    }
+    if (dest_width % 16 != 0) {
+        puts("ERROR: destination width must be multiple of 16");
+        return;
+    }
+    if (dest_width < data->bmheader->w || dest_height < data->bmheader->h) {
+        puts("ERROR: destination dimensions are smaller than source");
+        return;
+    }
+    int src_bytes_per_row = data->bmheader->w / 8;
+    int dest_bytes_per_row = dest_width / 8;
+    char *src_ptr = data->imgdata;
+    int src_offset, img_height = data->bmheader->h, num_planes = data->bmheader->nPlanes;
+    int row_data_size = num_planes * src_bytes_per_row;
+
+    for (int plane = 0; plane < num_planes; plane++) {
+        // copy row-by-row
+        for (int row = 0; row < img_height; row++) {
+            src_offset = (row * row_data_size) + (plane * src_bytes_per_row);
+            memcpy(dest, src_ptr + src_offset, src_bytes_per_row);
+            dest += dest_bytes_per_row;
+        }
+    }
+}
+
 #ifdef STANDALONE
 int main(int argc, char **argv)
 {
@@ -243,6 +285,15 @@ int main(int argc, char **argv)
   } else {
       ILBMData *data = parse_file(argv[1]);
       print_ilbm_info(data);
+
+      int wordwidth = (data->bmheader->w + 16) / 16;
+      int destWidth = wordwidth * 16;
+      int destHeight = data->bmheader->h;
+      int finalsize = wordwidth * data->bmheader->h * data->bmheader->nPlanes * 2;
+      printf("loaded size: %d, final size: %d\n", data->data_bytes, finalsize);
+      char *dest = calloc(finalsize, sizeof(char));
+      ilbm_to_image_data(dest, data, destWidth, destHeight);
+      free(dest);
       free_ilbm_data(data);
   }
 }

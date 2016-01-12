@@ -89,4 +89,5 @@ typedef struct _ILBMData {
 
 extern ILBMData *parse_file(const char *path);
 extern void free_ilbm_data(ILBMData *data);
+extern void ilbm_to_image_data(char *dest, ILBMData *data, int dest_width, int dest_height);
 #endif /* __ILBM_H__ */
