@@ -33,13 +33,13 @@
 
 #define WIN_LEFT       10
 #define WIN_TOP        10
-#define WIN_WIDTH      320
-#define WIN_HEIGHT     200
+#define WIN_WIDTH      340
+#define WIN_HEIGHT     220
 #define WIN_TITLE      "IFF Viewer"
 #define WIN_MIN_WIDTH  10
 #define WIN_MIN_HEIGHT 10
-#define WIN_MAX_WIDTH  200
-#define WIN_MAX_HEIGHT 200
+#define WIN_MAX_WIDTH  WIN_WIDTH
+#define WIN_MAX_HEIGHT WIN_HEIGHT
 
 #define FILE_MENU_NUM       0
 #define NUM_FILE_MENU_ITEMS 2
@@ -75,15 +75,18 @@ struct Menu menus[] = {
 };
 
 struct Window *window;
+struct Screen *screen;
 
 void cleanup()
 {
-  if (window) {
-    ClearMenuStrip(window);
-    CloseWindow(window);
-  }
+    if (window) {
+        ClearMenuStrip(window);
+        CloseWindow(window);
+    }
+    if (screen) {
+        CloseScreen(screen);
+    }
 }
-
 
 struct Requester *filereq;
 
@@ -171,6 +174,16 @@ void setup_menu()
 }
 
 struct Image image = { 0, 0, 0, 0, 0, NULL, 0, 0, NULL};
+struct NewScreen newscreen = {
+    0, 0, 320, 200, 5,
+    0, 1, // pens
+    0, // view modes
+    CUSTOMSCREEN, // type
+    NULL, // font
+    "My Screen", // title
+    NULL, // unused (gadgets)
+    NULL // custom bitmap
+};
 
 /* Defined automatically in VBCC */
 extern struct Library *DOSBase;
@@ -181,25 +194,41 @@ int main(int argc, char **argv)
     printf("DOS, version: %d, revision: %d\n",
            (int) DOSBase->lib_Version, (int) DOSBase->lib_Revision);
     ILBMData *ilbm_data = NULL;
+    //ilbm_data = parse_file("examples/Kickstart13.iff");
+    //ilbm_data = parse_file("examples/AH_KingTut.iff");
+    ilbm_data = parse_file("examples/DeluxePaint_Waterfall.iff");
+    image.Width = ilbm_data->bmheader->w;
+    image.Height = ilbm_data->bmheader->h;
+    image.Depth = ilbm_data->bmheader->nPlanes;
+    // if image.Width must be a multiple of 16
+    int mod16 = image.Width % 16;
+    image.Width = mod16 == 0 ? image.Width : image.Width + (16 - mod16);
+    int wordwidth = image.Width / 16;
+    int finalsize = wordwidth * image.Height * image.Depth * sizeof(UWORD);
+    image.ImageData = AllocMem(finalsize, MEMF_CHIP|MEMF_CLEAR);
+    ilbm_to_image_data((char *) image.ImageData, ilbm_data, wordwidth * 16, image.Height);
+    image.PlanePick = (1 << image.Depth) - 1;
+    /*
+      Note that the image width  is now set to the data's image width.
+      Displayed correctly now.
+    */
+    image.Width = wordwidth * 16;
+
+    /* Adjust the new screen according to the IFF image */
+    newscreen.Depth = image.Depth;
+    screen = OpenScreen(&newscreen);
+    if (screen) {
+        for (int i = 0; i < ilbm_data->num_colors; i++) {
+            ColorRegister *color = &ilbm_data->colors[i];
+            SetRGB4(&screen->ViewPort, i, color->red >> 4, color->green >> 4, color->blue >> 4);
+        }
+    }
+
     if (window = OpenWindow(&newwin)) {
         setup_menu();
-        ilbm_data = parse_file("examples/Kickstart13.iff");
-        image.Width = ilbm_data->bmheader->w;
-        image.Height = ilbm_data->bmheader->h;
-        image.Depth = ilbm_data->bmheader->nPlanes;
-        int wordwidth = (image.Width + 16) / 16;
-        int finalsize = wordwidth * image.Height * image.Depth * sizeof(UWORD);
-        image.ImageData = AllocMem(finalsize, MEMF_CHIP|MEMF_CLEAR);
-        ilbm_to_image_data((char *) image.ImageData, ilbm_data, wordwidth * 16, image.Height);
-        image.PlanePick = (1 << image.Depth) - 1;
-        /*
-           Note that the image width  is now set to the data's image width.
-           Displayed correctly now.
-         */
-        image.Width = wordwidth * 16;
-
         // Note: rastport is the entire window, including title bars
-        DrawImage(window->RPort, &image, 5, 10);
+        //DrawImage(window->RPort, &image, 2, 10);
+        if (screen) DrawImage(&screen->RastPort, &image, 0, 0);
         handle_events();
     }
     if (ilbm_data) free_ilbm_data(ilbm_data);

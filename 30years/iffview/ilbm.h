@@ -69,6 +69,7 @@ typedef struct {
   WORD  pageWidth, pageHeight;
 } BitMapHeader;
 
+/* Colors are in the range 0-255 */
 typedef struct {
   UBYTE red, green, blue;
 } ColorRegister;
