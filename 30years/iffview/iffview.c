@@ -28,7 +28,6 @@
 #ifdef __VBCC__
 #include <clib/alib_stdio_protos.h>
 #endif
-#include "filereq.h"
 #include "ilbm.h"
 
 #define WIN_LEFT       10
@@ -44,8 +43,7 @@
 #define FILE_MENU_NUM       0
 #define NUM_FILE_MENU_ITEMS 2
 
-#define OPEN_MENU_ITEM_NUM  0
-#define QUIT_MENU_ITEM_NUM  1
+#define QUIT_MENU_ITEM_NUM  0
 
 struct NewWindow newwin = {
   WIN_LEFT, WIN_TOP, WIN_WIDTH, WIN_HEIGHT, 0, 1,
@@ -64,8 +62,6 @@ struct IntuiText menutext[] = {
 };
 
 struct MenuItem fileMenuItems[] = {
-  {&fileMenuItems[1], 0, 0, 0, 0, ITEMTEXT | ITEMENABLED | HIGHCOMP | COMMSEQ, 0,
-   &menutext[0], NULL, 'O', NULL, 0},
   {NULL, 0, 0, 0, 0, ITEMTEXT | ITEMENABLED | HIGHCOMP | COMMSEQ, 0,
    &menutext[1], NULL, 'Q', NULL, 0}
 };
@@ -88,8 +84,6 @@ void cleanup()
     }
 }
 
-struct Requester *filereq;
-
 BOOL handle_menu(UWORD menuNum, UWORD itemNum, UWORD subItemNum)
 {
     printf("menu, menu num: %d, item num: %d, sub item num: %d\n",
@@ -97,9 +91,6 @@ BOOL handle_menu(UWORD menuNum, UWORD itemNum, UWORD subItemNum)
     if (menuNum == FILE_MENU_NUM && itemNum == QUIT_MENU_ITEM_NUM) {
         /* quit */
         return TRUE;
-    }
-    if (menuNum == FILE_MENU_NUM && itemNum == OPEN_MENU_ITEM_NUM) {
-        filereq = open_file(window);
     }
     return FALSE;
 }
@@ -123,11 +114,6 @@ void handle_events()
             case IDCMP_MENUPICK:
                 menuCode = msg->Code;
                 done = handle_menu(MENUNUM(menuCode), ITEMNUM(menuCode), SUBNUM(menuCode));
-                break;
-            case IDCMP_GADGETUP:
-                buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
-                if (buttonId == REQ_OK_BUTTON_ID && filereq) EndRequest(filereq, window);
-                else if (buttonId == REQ_CANCEL_BUTTON_ID && filereq) EndRequest(filereq, window);
                 break;
             case IDCMP_REQCLEAR:
                 puts("requester closed");
@@ -194,9 +180,7 @@ int main(int argc, char **argv)
     printf("DOS, version: %d, revision: %d\n",
            (int) DOSBase->lib_Version, (int) DOSBase->lib_Revision);
     ILBMData *ilbm_data = NULL;
-    //ilbm_data = parse_file("examples/Kickstart13.iff");
-    //ilbm_data = parse_file("examples/AH_KingTut.iff");
-    ilbm_data = parse_file("examples/DeluxePaint_Waterfall.iff");
+    ilbm_data = parse_file("examples/AH_KingTut.iff");
     image.Width = ilbm_data->bmheader->w;
     image.Height = ilbm_data->bmheader->h;
     image.Depth = ilbm_data->bmheader->nPlanes;
@@ -206,13 +190,9 @@ int main(int argc, char **argv)
     int wordwidth = image.Width / 16;
     int finalsize = wordwidth * image.Height * image.Depth * sizeof(UWORD);
     image.ImageData = AllocMem(finalsize, MEMF_CHIP|MEMF_CLEAR);
-    ilbm_to_image_data((char *) image.ImageData, ilbm_data, wordwidth * 16, image.Height);
+    ilbm_to_image_data((char *) image.ImageData, ilbm_data, wordwidth * 16,
+                       image.Height);
     image.PlanePick = (1 << image.Depth) - 1;
-    /*
-      Note that the image width  is now set to the data's image width.
-      Displayed correctly now.
-    */
-    image.Width = wordwidth * 16;
 
     /* Adjust the new screen according to the IFF image */
     newscreen.Depth = image.Depth;
@@ -220,7 +200,8 @@ int main(int argc, char **argv)
     if (screen) {
         for (int i = 0; i < ilbm_data->num_colors; i++) {
             ColorRegister *color = &ilbm_data->colors[i];
-            SetRGB4(&screen->ViewPort, i, color->red >> 4, color->green >> 4, color->blue >> 4);
+            SetRGB4(&screen->ViewPort, i, color->red >> 4,
+                    color->green >> 4, color->blue >> 4);
         }
     }
 
