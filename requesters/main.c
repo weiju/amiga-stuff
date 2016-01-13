@@ -46,10 +46,10 @@
 #define OPEN_MENU_ITEM_NUM  0
 #define QUIT_MENU_ITEM_NUM  1
 
-struct NewWindow newwin = {
+static struct NewWindow newwin = {
   WIN_LEFT, WIN_TOP, WIN_WIDTH, WIN_HEIGHT, 0, 1,
   IDCMP_CLOSEWINDOW | IDCMP_MENUPICK | IDCMP_GADGETUP | IDCMP_REQCLEAR,
-  WINDOWCLOSE | SMART_REFRESH | ACTIVATE | WINDOWSIZING | WINDOWDRAG | WINDOWDEPTH | NOCAREREFRESH,
+  WINDOWCLOSE | SMART_REFRESH | ACTIVATE | WINDOWSIZING | WINDOWDRAG | WINDOWDEPTH,
   NULL, NULL, WIN_TITLE,
   NULL, NULL,
   WIN_MIN_WIDTH, WIN_MIN_HEIGHT,
@@ -57,25 +57,25 @@ struct NewWindow newwin = {
   WBENCHSCREEN
 };
 
-struct IntuiText menutext[] = {
+static struct IntuiText menutext[] = {
   {0, 1, JAM2, 0, 1, NULL, "Open...", NULL},
   {0, 1, JAM2, 0, 1, NULL, "Quit", NULL}
 };
 
-struct MenuItem fileMenuItems[] = {
+static struct MenuItem fileMenuItems[] = {
   {&fileMenuItems[1], 0, 0, 0, 0, ITEMTEXT | ITEMENABLED | HIGHCOMP | COMMSEQ, 0,
    &menutext[0], NULL, 'O', NULL, 0},
   {NULL, 0, 0, 0, 0, ITEMTEXT | ITEMENABLED | HIGHCOMP | COMMSEQ, 0,
    &menutext[1], NULL, 'Q', NULL, 0}
 };
 
-struct Menu menus[] = {
+static struct Menu menus[] = {
   {NULL, 20, 0, 0, 0, MENUENABLED | MIDRAWN, "File", &fileMenuItems[0], 0, 0, 0, 0}
 };
 
-struct Window *window;
+static struct Window *window;
 
-void cleanup()
+static void cleanup()
 {
     if (window) {
         ClearMenuStrip(window);
@@ -83,9 +83,7 @@ void cleanup()
     }
 }
 
-struct Requester *filereq;
-
-BOOL handle_menu(UWORD menuNum, UWORD itemNum, UWORD subItemNum)
+static BOOL handle_menu(UWORD menuNum, UWORD itemNum, UWORD subItemNum)
 {
     printf("menu, menu num: %d, item num: %d, sub item num: %d\n",
            (int) menuNum, (int) itemNum, (int) subItemNum);
@@ -94,12 +92,12 @@ BOOL handle_menu(UWORD menuNum, UWORD itemNum, UWORD subItemNum)
         return TRUE;
     }
     if (menuNum == FILE_MENU_NUM && itemNum == OPEN_MENU_ITEM_NUM) {
-        filereq = open_file(window);
+        open_file(window);
     }
     return FALSE;
 }
 
-void handle_events()
+static void handle_events()
 {
     BOOL done = FALSE;
     struct IntuiMessage *msg;
@@ -108,6 +106,7 @@ void handle_events()
     int buttonId;
 
     while (!done) {
+        puts("main, wait...");
         Wait(1 << window->UserPort->mp_SigBit);
         if (msg = (struct IntuiMessage *) GetMsg(window->UserPort)) {
             msgClass = msg->Class;
@@ -119,14 +118,6 @@ void handle_events()
                 menuCode = msg->Code;
                 done = handle_menu(MENUNUM(menuCode), ITEMNUM(menuCode), SUBNUM(menuCode));
                 break;
-            case IDCMP_GADGETUP:
-                buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
-                if (buttonId == REQ_OK_BUTTON_ID && filereq) EndRequest(filereq, window);
-                else if (buttonId == REQ_CANCEL_BUTTON_ID && filereq) EndRequest(filereq, window);
-                break;
-            case IDCMP_REQCLEAR:
-                puts("requester closed");
-                break;
             default:
                 break;
             }
@@ -135,7 +126,7 @@ void handle_events()
     }
 }
 
-void setup_menu()
+static void setup_menu()
 {
     UWORD txWidth, txHeight, txBaseline, txSpacing, itemWidth, itemHeight, numItems;
     struct RastPort *rp = &window->WScreen->RastPort;
@@ -164,7 +155,6 @@ void setup_menu()
         fileMenuItems[i].Height = itemHeight;
         fileMenuItems[i].Width = itemWidth;
     }
-
     SetMenuStrip(window, &menus[0]);
 }
 
@@ -180,10 +170,9 @@ int main(int argc, char **argv)
     /* Adjust the new screen according to the IFF image */
     if (window = OpenWindow(&newwin)) {
         setup_menu();
-        // Note: rastport is the entire window, including title bars
-        //DrawImage(window->RPort, &image, 2, 10);
         handle_events();
     }
+    puts("main cleanup");
     cleanup();
     return 1;
 }
