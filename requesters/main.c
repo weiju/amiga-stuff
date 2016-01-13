@@ -85,12 +85,7 @@ static void cleanup()
 
 static BOOL handle_menu(UWORD menuNum, UWORD itemNum, UWORD subItemNum)
 {
-    printf("menu, menu num: %d, item num: %d, sub item num: %d\n",
-           (int) menuNum, (int) itemNum, (int) subItemNum);
-    if (menuNum == FILE_MENU_NUM && itemNum == QUIT_MENU_ITEM_NUM) {
-        /* quit */
-        return TRUE;
-    }
+    if (menuNum == FILE_MENU_NUM && itemNum == QUIT_MENU_ITEM_NUM) return TRUE;
     if (menuNum == FILE_MENU_NUM && itemNum == OPEN_MENU_ITEM_NUM) {
         open_file(window);
     }
@@ -106,22 +101,21 @@ static void handle_events()
     int buttonId;
 
     while (!done) {
-        puts("main, wait...");
         Wait(1 << window->UserPort->mp_SigBit);
         if (msg = (struct IntuiMessage *) GetMsg(window->UserPort)) {
             msgClass = msg->Class;
+            menuCode = msg->Code;
+            ReplyMsg((struct Message *) msg);
             switch (msgClass) {
             case IDCMP_CLOSEWINDOW:
                 done = TRUE;
                 break;
             case IDCMP_MENUPICK:
-                menuCode = msg->Code;
                 done = handle_menu(MENUNUM(menuCode), ITEMNUM(menuCode), SUBNUM(menuCode));
                 break;
             default:
                 break;
             }
-            ReplyMsg((struct Message *) msg);
         }
     }
 }
@@ -172,7 +166,6 @@ int main(int argc, char **argv)
         setup_menu();
         handle_events();
     }
-    puts("main cleanup");
     cleanup();
     return 1;
 }

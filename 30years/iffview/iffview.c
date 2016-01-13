@@ -16,6 +16,7 @@
    along with amiga30yrs.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <string.h>
+#include <stdlib.h>
 
 #include <exec/libraries.h>
 #include <intuition/intuition.h>
@@ -173,6 +174,7 @@ int main(int argc, char **argv)
     }
     ILBMData *ilbm_data = NULL;
     ilbm_data = parse_file(argv[1]);
+    if (!ilbm_data) exit(0);
     image.Width = ilbm_data->bmheader->w;
     image.Height = ilbm_data->bmheader->h;
     image.Depth = ilbm_data->bmheader->nPlanes;
@@ -186,6 +188,7 @@ int main(int argc, char **argv)
     image.PlanePick = (1 << image.Depth) - 1;
 
     /* Adjust the new screen according to the IFF image */
+    newscreen.ViewModes = ilbm_data->bmheader->camgFlags;
     newscreen.Depth = image.Depth;
     screen = OpenScreen(&newscreen);
     if (screen) {

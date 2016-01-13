@@ -7,7 +7,6 @@
 
 #include "filereq.h"
 
-#define REQ_TEXT_XOFFSET 10
 #define REQ_WIDTH 240
 #define REQ_HEIGHT 175
 #define TOPAZ_BASELINE 8
@@ -21,19 +20,25 @@
 #define OK_BUTTON_WIDTH      40
 #define CANCEL_BUTTON_WIDTH  60
 
-#define STR_GADGET_X  90
-#define STR_GADGET_Y  120
-#define PATH_GADGET_WIDTH    100
+#define DRAWER_GADGET_X  80
+#define DRAWER_GADGET_Y  95
+#define FILE_GADGET_X  80
+#define FILE_GADGET_Y  115
+#define PATH_GADGET_WIDTH    120
+#define STR_LABEL_XOFFSET -70
+#define STR_LABEL_YOFFSET 2
 
 static struct Requester requester;
 static BOOL req_opened = FALSE;
 static struct Window *req_window;
 
-static struct IntuiText labels[] = {
-    {1, 0, JAM2, REQ_TEXT_XOFFSET, STR_GADGET_Y, NULL, "Enter file path", NULL},
-    {1, 0, JAM2, 10, TOPAZ_BASELINE - 4, NULL, "Ok", NULL},
-    {1, 0, JAM2, 10, TOPAZ_BASELINE - 4, NULL, "Cancel", NULL} /* TOPAZ_BASELINE is 8 */
-};
+static struct IntuiText drawer_str_label =  {1, 0, JAM2, STR_LABEL_XOFFSET, STR_LABEL_YOFFSET, NULL,
+                                             "Drawer", NULL};
+static struct IntuiText file_str_label = {1, 0, JAM2, STR_LABEL_XOFFSET, STR_LABEL_YOFFSET, NULL,
+                                              "File", NULL};
+static struct IntuiText ok_button_label = {1, 0, JAM2, 10, TOPAZ_BASELINE - 4, NULL, "Ok", NULL};
+static struct IntuiText cancel_button_label = {1, 0, JAM2, 10, TOPAZ_BASELINE - 4, NULL,
+                                               "Cancel", NULL};
 
 static WORD gadget_border_points[3][10] = {
     {0, 0, OK_BUTTON_WIDTH, 0, OK_BUTTON_WIDTH, BUTTON_HEIGHT, 0, BUTTON_HEIGHT, 0, 0},
@@ -43,14 +48,14 @@ static WORD gadget_border_points[3][10] = {
     {-2, -2, PATH_GADGET_WIDTH, -2, PATH_GADGET_WIDTH, 10, -2, 10, -2, -2}
 };
 
-static struct Border gadget_borders[] = {
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[0], NULL},
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[1], NULL},
-    {0, 0, 1, 0, JAM1, 5, gadget_border_points[2], NULL}
-};
+static struct Border ok_button_border = {0, 0, 1, 0, JAM1, 5, gadget_border_points[0], NULL};
+static struct Border cancel_button_border = {0, 0, 1, 0, JAM1, 5, gadget_border_points[1], NULL};
+static struct Border str_gadget_border = {0, 0, 1, 0, JAM1, 5, gadget_border_points[2], NULL};
 
-static UBYTE buffer[81], undobuffer[81];
-static struct StringInfo strinfo = {buffer, undobuffer, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
+static UBYTE buffer1[82], undobuffer1[82];
+static struct StringInfo strinfo1 = {buffer1, undobuffer1, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
+static UBYTE buffer2[82], undobuffer2[82];
+static struct StringInfo strinfo2 = {buffer2, undobuffer2, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
 
 #define REQWIN_WIDTH 260
 #define REQWIN_HEIGHT 180
@@ -58,8 +63,8 @@ static struct StringInfo strinfo = {buffer, undobuffer, 0, 80, 0, 0, 0, 0, 0, 0,
 
 static struct NewWindow newwin = {
   0, 0, REQWIN_WIDTH, REQWIN_HEIGHT, 0, 1,
-  IDCMP_CLOSEWINDOW | IDCMP_GADGETUP,
-  WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE | WFLG_DRAGBAR | WFLG_DEPTHGADGET,
+  IDCMP_GADGETUP,
+  WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE | WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_NOCAREREFRESH,
   NULL, NULL, WIN_TITLE,
   NULL, NULL,
   REQWIN_WIDTH, REQWIN_HEIGHT,
@@ -73,14 +78,17 @@ static struct NewWindow newwin = {
 */
 static struct Gadget gadgets[] = {
     {&gadgets[1], OK_BUTTON_X, BUTTON_Y, OK_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
-     GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET, &gadget_borders[0], NULL,
-     &labels[1], 0, NULL, REQ_OK_BUTTON_ID, NULL},
+     GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET, &ok_button_border, NULL,
+     &ok_button_label, 0, NULL, REQ_OK_BUTTON_ID, NULL},
     {&gadgets[2], CANCEL_BUTTON_X, BUTTON_Y, CANCEL_BUTTON_WIDTH, BUTTON_HEIGHT, GFLG_GADGHCOMP,
-     GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET, &gadget_borders[1], NULL,
-     &labels[2], 0, NULL, REQ_CANCEL_BUTTON_ID, NULL},
-    {NULL, STR_GADGET_X, STR_GADGET_Y, PATH_GADGET_WIDTH, 10,
-     GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &gadget_borders[2], NULL,
-     &labels[3], 0, &strinfo, 103, NULL},
+     GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET, &cancel_button_border, NULL,
+     &cancel_button_label, 0, NULL, REQ_CANCEL_BUTTON_ID, NULL},
+    {&gadgets[3], DRAWER_GADGET_X, DRAWER_GADGET_Y, PATH_GADGET_WIDTH, 10,
+     GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &str_gadget_border, NULL,
+     &drawer_str_label, 0, &strinfo1, 103, NULL},
+    {NULL, FILE_GADGET_X, FILE_GADGET_Y, PATH_GADGET_WIDTH, 10,
+     GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &str_gadget_border, NULL,
+     &file_str_label, 0, &strinfo2, 104, NULL},
 };
 
 #define PATHBUFFER_SIZE 200
@@ -100,9 +108,7 @@ static void print_fileinfo(struct FileInfoBlock *fileinfo)
 
 static void close_requester()
 {
-    puts("close_requester()");
     if (req_opened) {
-        puts("EndRequest()");
         EndRequest(&requester, req_window);
         req_opened = FALSE;
     }
@@ -121,12 +127,9 @@ static void handle_events()
         if (msg = (struct IntuiMessage *) GetMsg(req_window->UserPort)) {
             msgClass = msg->Class;
             switch (msgClass) {
-            case IDCMP_CLOSEWINDOW:
-                close_requester();
-                done = TRUE;
-                break;
             case IDCMP_GADGETUP:
                 buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
+                ReplyMsg((struct Message *) msg);
                 if (buttonId == REQ_OK_BUTTON_ID) {
                     close_requester();
                     done = TRUE;
@@ -139,7 +142,6 @@ static void handle_events()
             default:
                 break;
             }
-            ReplyMsg((struct Message *) msg);
         }
     }
 }
@@ -153,11 +155,11 @@ void open_file(struct Window *window)
         requester.TopEdge = 20;
         requester.Width = REQ_WIDTH;
         requester.Height = REQ_HEIGHT;
-        requester.Flags = 0;
+        requester.Flags = SIMPLEREQ;
         requester.BackFill = 0;
         requester.ReqGadget = &gadgets[0];
-        requester.ReqBorder = NULL; // &req_border;
-        requester.ReqText = &labels[0];
+        requester.ReqBorder = NULL;
+        requester.ReqText = NULL;
 
         /* scan current directory */
         /*
@@ -184,9 +186,7 @@ void open_file(struct Window *window)
         UnLock(flock);
         */
         if (req_opened = Request(&requester, req_window)) {
-            puts("handle requester events...");
             handle_events();
-            puts("quit handling requester events");
             CloseWindow(req_window);
             req_window = NULL;
         } else {

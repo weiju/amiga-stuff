@@ -58,15 +58,16 @@ typedef UBYTE Compression;
 #define cmpByteRun1  1
 
 typedef struct {
-  UWORD w, h;
-  WORD  x, y;
-  UBYTE nPlanes;
-  Masking masking;
-  Compression compression;
-  UBYTE pad1;
-  UWORD transparentColor;
-  UBYTE xAspect, yAspect;
-  WORD  pageWidth, pageHeight;
+    UWORD w, h;
+    WORD  x, y;
+    UBYTE nPlanes;
+    Masking masking;
+    Compression compression;
+    UBYTE pad1;
+    UWORD transparentColor;
+    UBYTE xAspect, yAspect;
+    WORD  pageWidth, pageHeight;
+    ULONG camgFlags;
 } BitMapHeader;
 
 /* Colors are in the range 0-255 */

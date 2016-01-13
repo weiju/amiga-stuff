@@ -33,7 +33,7 @@ BitMapHeader *read_BMHD(FILE *fp, int datasize)
   BitMapHeader *header;
   int bytes_read;
 
-  header = malloc(sizeof(BitMapHeader));
+  header = calloc(1, sizeof(BitMapHeader));
   bytes_read = fread(header, sizeof(char), datasize, fp);
 
 #ifdef LITTLE_ENDIAN
@@ -156,7 +156,7 @@ ILBMData *read_chunks(FILE *fp, int filesize, int total_read)
         if (!strncmp("BMHD", buffer, 4)) bmheader = read_BMHD(fp, datasize);
         else if (!strncmp("CMAP", buffer, 4)) colors = read_CMAP(fp, datasize, &result->num_colors);
         else if (!strncmp("CRNG", buffer, 4)) read_CRNG(fp, datasize);
-        else if (!strncmp("CAMG", buffer, 4)) read_CAMG(fp, datasize);
+        else if (!strncmp("CAMG", buffer, 4)) bmheader->camgFlags = read_CAMG(fp, datasize);
         else if (!strncmp("BODY", buffer, 4)) imgdata = read_BODY(fp, datasize, bmheader, &imgdata_size);
         else {
 #ifdef DEBUG
@@ -285,14 +285,17 @@ int main(int argc, char **argv)
   } else {
       ILBMData *data = parse_file(argv[1]);
       print_ilbm_info(data);
-
-      int wordwidth = (data->bmheader->w + 16) / 16;
-      int destWidth = wordwidth * 16;
-      int destHeight = data->bmheader->h;
+      int dest_width = data->bmheader->w;
+      int mod16 = dest_width % 16;
+      if (mod16 > 0) {
+          dest_width += mod16;
+      }
+      int wordwidth = dest_width / 16;
+      int dest_height = data->bmheader->h;
       int finalsize = wordwidth * data->bmheader->h * data->bmheader->nPlanes * 2;
       printf("loaded size: %d, final size: %d\n", data->data_bytes, finalsize);
       char *dest = calloc(finalsize, sizeof(char));
-      ilbm_to_image_data(dest, data, destWidth, destHeight);
+      ilbm_to_image_data(dest, data, dest_width, dest_height);
       free(dest);
       free_ilbm_data(data);
   }
