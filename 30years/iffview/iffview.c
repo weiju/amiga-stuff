@@ -30,30 +30,21 @@
 #endif
 #include "ilbm.h"
 
-#define WIN_LEFT       10
-#define WIN_TOP        10
-#define WIN_WIDTH      340
-#define WIN_HEIGHT     220
 #define WIN_TITLE      "IFF Viewer"
-#define WIN_MIN_WIDTH  10
-#define WIN_MIN_HEIGHT 10
-#define WIN_MAX_WIDTH  WIN_WIDTH
-#define WIN_MAX_HEIGHT WIN_HEIGHT
-
 #define FILE_MENU_NUM       0
 #define NUM_FILE_MENU_ITEMS 2
 
 #define QUIT_MENU_ITEM_NUM  0
 
 struct NewWindow newwin = {
-  WIN_LEFT, WIN_TOP, WIN_WIDTH, WIN_HEIGHT, 0, 1,
-  IDCMP_CLOSEWINDOW | IDCMP_MENUPICK | IDCMP_GADGETUP | IDCMP_REQCLEAR,
-  WINDOWCLOSE | SMART_REFRESH | ACTIVATE | WINDOWSIZING | WINDOWDRAG | WINDOWDEPTH | NOCAREREFRESH,
+  0, 0, 0, 0, 0, 1,
+  IDCMP_CLOSEWINDOW | IDCMP_MENUPICK,
+  WFLG_CLOSEGADGET | WFLG_ACTIVATE | WFLG_NOCAREREFRESH | WFLG_BACKDROP,
   NULL, NULL, WIN_TITLE,
   NULL, NULL,
-  WIN_MIN_WIDTH, WIN_MIN_HEIGHT,
-  WIN_MAX_WIDTH, WIN_MAX_HEIGHT,
-  WBENCHSCREEN
+  0, 0,
+  0, 0,
+  CUSTOMSCREEN
 };
 
 struct IntuiText menutext[] = {
@@ -176,11 +167,12 @@ extern struct Library *DOSBase;
 
 int main(int argc, char **argv)
 {
-    /* version: e.g. 34, revision e.g. 3 for Kickstart 1.3 */
-    printf("DOS, version: %d, revision: %d\n",
-           (int) DOSBase->lib_Version, (int) DOSBase->lib_Revision);
+    if (argc <= 1) {
+        puts("Usage: iffview <iff-file>");
+        return 0;
+    }
     ILBMData *ilbm_data = NULL;
-    ilbm_data = parse_file("examples/AH_KingTut.iff");
+    ilbm_data = parse_file(argv[1]);
     image.Width = ilbm_data->bmheader->w;
     image.Height = ilbm_data->bmheader->h;
     image.Depth = ilbm_data->bmheader->nPlanes;
@@ -190,27 +182,30 @@ int main(int argc, char **argv)
     int wordwidth = image.Width / 16;
     int finalsize = wordwidth * image.Height * image.Depth * sizeof(UWORD);
     image.ImageData = AllocMem(finalsize, MEMF_CHIP|MEMF_CLEAR);
-    ilbm_to_image_data((char *) image.ImageData, ilbm_data, wordwidth * 16,
-                       image.Height);
+    ilbm_to_image_data((char *) image.ImageData, ilbm_data, image.Width, image.Height);
     image.PlanePick = (1 << image.Depth) - 1;
 
     /* Adjust the new screen according to the IFF image */
     newscreen.Depth = image.Depth;
     screen = OpenScreen(&newscreen);
     if (screen) {
+        ShowTitle(screen, FALSE);
         for (int i = 0; i < ilbm_data->num_colors; i++) {
             ColorRegister *color = &ilbm_data->colors[i];
             SetRGB4(&screen->ViewPort, i, color->red >> 4,
                     color->green >> 4, color->blue >> 4);
         }
-    }
-
-    if (window = OpenWindow(&newwin)) {
-        setup_menu();
-        // Note: rastport is the entire window, including title bars
-        //DrawImage(window->RPort, &image, 2, 10);
-        if (screen) DrawImage(&screen->RastPort, &image, 0, 0);
-        handle_events();
+        newwin.Width = newwin.MinWidth = newwin.MaxWidth = newscreen.Width;
+        newwin.Height = newwin.MinHeight = newwin.MaxWidth = newscreen.Height;
+        newwin.Screen = screen;
+        if (window = OpenWindow(&newwin)) {
+            setup_menu();
+            // When drawing to a screen's rastport directly, the image must be contained
+            // within its boundaries otherwise it crashes, draw to a Window and it will be clipped
+            // Note: rastport is the entire window, including title bars
+            if (screen) DrawImage(window->RPort, &image, 0, 0);
+            handle_events();
+        }
     }
     if (ilbm_data) free_ilbm_data(ilbm_data);
     cleanup();
