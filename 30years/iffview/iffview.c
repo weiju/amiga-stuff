@@ -153,7 +153,7 @@ void setup_menu()
 
 struct Image image = { 0, 0, 0, 0, 0, NULL, 0, 0, NULL};
 struct NewScreen newscreen = {
-    0, 0, 320, 200, 5,
+    0, 0, 320, 256, 5,
     0, 1, // pens
     0, // view modes
     CUSTOMSCREEN, // type
