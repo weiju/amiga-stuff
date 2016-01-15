@@ -35,25 +35,48 @@
 #define FILE_GADGET_X  DRAWER_GADGET_X
 #define FILE_GADGET_Y  115
 #define PATH_GADGET_WIDTH    160
+#define PATH_GADGET_HEIGHT   10
 #define STR_LABEL_XOFFSET -60
 #define STR_LABEL_YOFFSET 2
 
-#define FILE_LIST_WIDTH 224
+#define FILE_LIST_WIDTH 229
 #define FILE_LIST_HEIGHT 86
 
 #define LIST_VSLIDER_X FILE_LIST_WIDTH
 #define LIST_VSLIDER_Y 0
-#define LIST_VSLIDER_WIDTH 12
-#define LIST_VSLIDER_HEIGHT 70
+#define LIST_VSLIDER_WIDTH 11
+#define LIST_VSLIDER_HEIGHT 65
+
+#define LIST_UP_X FILE_LIST_WIDTH
+#define LIST_UP_Y 65
+#define LIST_DOWN_X LIST_UP_X
+#define LIST_DOWN_Y (LIST_UP_Y + LIST_BUTTON_HEIGHT)
+#define LIST_BUTTON_WIDTH 11
+#define LIST_BUTTON_HEIGHT 11
 
 #define REQ_OK_BUTTON_ID     101
 #define REQ_DRIVES_BUTTON_ID 102
 #define REQ_PARENT_BUTTON_ID 103
 #define REQ_CANCEL_BUTTON_ID 104
 
+#define REQ_DIR_TEXT_ID 110
+#define REQ_FILE_TEXT_ID 111
+#define REQ_VSLIDER_ID 112
+#define REQ_UP_ID 113
+#define REQ_DOWN_ID 114
+
 static struct Requester requester;
 static BOOL req_opened = FALSE;
 static struct Window *req_window;
+
+// if image data is in fast RAM, we see nothing !!!
+static UWORD __chip up_imdata[] = { 65504, 32800, 32800, 32800, 33824, 36384, 39712, 32800,
+                                    32800, 32800, 65504 };
+static struct Image up_image = { 0, 0, 11, 11, 1, up_imdata, 1, 0, NULL };
+
+static UWORD __chip down_imdata[] = { 65504, 32800, 32800, 32800, 39712, 36384, 33824, 32800,
+                                      32800, 32800, 65504 };
+static struct Image down_image = { 0, 0, 11, 11, 1, down_imdata, 1, 0, NULL };
 
 static struct IntuiText drawer_str_label =  {1, 0, JAM2, STR_LABEL_XOFFSET, STR_LABEL_YOFFSET, NULL,
                                              "Drawer", NULL};
@@ -109,41 +132,64 @@ static struct NewWindow newwin = {
   WBENCHSCREEN
 };
 
-static struct Gadget list_vslider = {NULL, LIST_VSLIDER_X, LIST_VSLIDER_Y,
+static struct Gadget list_down = {NULL, LIST_DOWN_X, LIST_DOWN_Y,
+                                  LIST_BUTTON_WIDTH, LIST_BUTTON_HEIGHT,
+                                  GFLG_GADGHCOMP | GFLG_GADGIMAGE, GACT_RELVERIFY,
+                                  GTYP_BOOLGADGET | GTYP_REQGADGET,
+                                  &down_image, NULL,
+                                  NULL, 0, NULL,
+                                  REQ_DOWN_ID, NULL};
+
+static struct Gadget list_up = {&list_down, LIST_UP_X, LIST_UP_Y,
+                                LIST_BUTTON_WIDTH, LIST_BUTTON_HEIGHT,
+                                GFLG_GADGHCOMP | GFLG_GADGIMAGE, GACT_RELVERIFY,
+                                GTYP_BOOLGADGET | GTYP_REQGADGET,
+                                &up_image, NULL,
+                                NULL, 0, NULL,
+                                REQ_UP_ID, NULL};
+
+static struct Gadget list_vslider = {&list_up, LIST_VSLIDER_X, LIST_VSLIDER_Y,
                                      LIST_VSLIDER_WIDTH, LIST_VSLIDER_HEIGHT,
                                      GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_PROPGADGET,
-                                     &slider_image, NULL, NULL, 0, &propinfo, 112, NULL};
+                                     &slider_image, NULL, NULL, 0, &propinfo,
+                                     REQ_VSLIDER_ID, NULL};
 
-static struct Gadget file_text = {&list_vslider, FILE_GADGET_X, FILE_GADGET_Y, PATH_GADGET_WIDTH, 10,
-                                  GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &str_gadget_border,
-                                  NULL, &file_str_label, 0, &strinfo2, 111, NULL};
+static struct Gadget file_text = {&list_vslider, FILE_GADGET_X, FILE_GADGET_Y,
+                                  PATH_GADGET_WIDTH, PATH_GADGET_HEIGHT,
+                                  GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET,
+                                  &str_gadget_border, NULL, &file_str_label, 0, &strinfo2,
+                                  REQ_FILE_TEXT_ID, NULL};
 
-static struct Gadget dir_text = {&file_text, DRAWER_GADGET_X, DRAWER_GADGET_Y, PATH_GADGET_WIDTH, 10,
-                                 GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET, &str_gadget_border,
-                                 NULL, &drawer_str_label, 0, &strinfo1, 110, NULL};
-/*
-  Note: Cancel does not specify the GACT_ENDGADGET flag, it seems that
-  IDCMP_REQCLEAR is not fired when Intuition closes the requester automatically
-*/
+static struct Gadget dir_text = {&file_text, DRAWER_GADGET_X, DRAWER_GADGET_Y,
+                                 PATH_GADGET_WIDTH, PATH_GADGET_HEIGHT,
+                                 GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET,
+                                 &str_gadget_border,
+                                 NULL, &drawer_str_label, 0, &strinfo1,REQ_DIR_TEXT_ID, NULL};
+
+//  Note: Cancel does not specify the GACT_ENDGADGET flag, it seems that
+//  IDCMP_REQCLEAR is not fired when Intuition closes the requester automatically
 static struct Gadget cancel_button = {&dir_text, CANCEL_BUTTON_X, BUTTON_Y, CANCEL_BUTTON_WIDTH,
                                       BUTTON_HEIGHT, GFLG_GADGHCOMP, GACT_RELVERIFY,
                                       GTYP_BOOLGADGET | GTYP_REQGADGET, &cancel_button_border, NULL,
                                       &cancel_button_label, 0, NULL, REQ_CANCEL_BUTTON_ID, NULL};
 
-static struct Gadget parent_button = {&cancel_button, PARENT_BUTTON_X, BUTTON_Y, PARENT_BUTTON_WIDTH,
-                                      BUTTON_HEIGHT,
-                                      GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET,
+static struct Gadget parent_button = {&cancel_button, PARENT_BUTTON_X, BUTTON_Y,
+                                      PARENT_BUTTON_WIDTH, BUTTON_HEIGHT,
+                                      GFLG_GADGHCOMP, GACT_RELVERIFY,
+                                      GTYP_BOOLGADGET | GTYP_REQGADGET,
                                       &parent_button_border, NULL, &parent_button_label, 0, NULL,
                                       REQ_PARENT_BUTTON_ID, NULL};
 
-static struct Gadget drives_button = {&parent_button, DRIVES_BUTTON_X, BUTTON_Y, DRIVES_BUTTON_WIDTH,
-                                      BUTTON_HEIGHT,
-                                      GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET,
+static struct Gadget drives_button = {&parent_button, DRIVES_BUTTON_X, BUTTON_Y,
+                                      DRIVES_BUTTON_WIDTH, BUTTON_HEIGHT,
+                                      GFLG_GADGHCOMP, GACT_RELVERIFY,
+                                      GTYP_BOOLGADGET | GTYP_REQGADGET,
                                       &drives_button_border, NULL, &drives_button_label, 0, NULL,
                                       REQ_DRIVES_BUTTON_ID, NULL};
-
-static struct Gadget ok_button = {&drives_button, OK_BUTTON_X, BUTTON_Y, OK_BUTTON_WIDTH, BUTTON_HEIGHT,
-                                  GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_BOOLGADGET | GTYP_REQGADGET,
+static struct Gadget ok_button = {&drives_button, OK_BUTTON_X, BUTTON_Y,
+                                  OK_BUTTON_WIDTH, BUTTON_HEIGHT,
+                                  GFLG_GADGHCOMP, GACT_RELVERIFY,
+                                  GTYP_BOOLGADGET | GTYP_REQGADGET,
                                   &ok_button_border, NULL, &ok_button_label, 0, NULL,
                                   REQ_OK_BUTTON_ID, NULL};
 
