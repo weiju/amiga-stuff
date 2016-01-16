@@ -1,4 +1,6 @@
+#include <string.h>
 #include <intuition/intuition.h>
+#include <dos/dosextens.h>
 
 #include <clib/exec_protos.h>
 #include <clib/intuition_protos.h>
@@ -7,6 +9,14 @@
 #include <clib/alib_stdio_protos.h>
 
 #include "filereq.h"
+#include "dos13.h"
+
+#define LABEL_DRAWER 0
+#define LABEL_FILE   1
+#define LABEL_PARENT 2
+#define LABEL_DRIVES 3
+#define LABEL_OPEN   4
+#define LABEL_CANCEL 5
 
 #define REQWIN_WIDTH 260
 #define REQWIN_HEIGHT 180
@@ -86,15 +96,15 @@ static UWORD __chip down_imdata[] = { 65504, 32800, 32800, 32800, 39712, 36384, 
                                       32800, 32800, 65504 };
 static struct Image down_image = { 0, 0, 11, 11, 1, down_imdata, 1, 0, NULL };
 
-static struct IntuiText drawer_str_label =  {1, 0, JAM2, STR_LABEL_XOFFSET, STR_LABEL_YOFFSET, NULL,
-                                             "Drawer", NULL};
-static struct IntuiText file_str_label = {1, 0, JAM2, STR_LABEL_XOFFSET, STR_LABEL_YOFFSET, NULL,
-                                              "File", NULL};
-static struct IntuiText parent_button_label = {1, 0, JAM2, BUTTON_TEXT_XOFFSET, BUTTON_TEXT_YOFFSET, NULL, "Parent", NULL};
-static struct IntuiText drives_button_label = {1, 0, JAM2, BUTTON_TEXT_XOFFSET, BUTTON_TEXT_YOFFSET, NULL, "Drives", NULL};
-static struct IntuiText ok_button_label = {1, 0, JAM2, BUTTON_TEXT_XOFFSET, BUTTON_TEXT_YOFFSET, NULL, "Open", NULL};
-static struct IntuiText cancel_button_label = {1, 0, JAM2, BUTTON_TEXT_XOFFSET, BUTTON_TEXT_YOFFSET, NULL,
-                                               "Cancel", NULL};
+static struct IntuiText labels[] = {
+    {1, 0, JAM2, STR_LABEL_XOFFSET, STR_LABEL_YOFFSET, NULL, "Drawer", NULL},
+    {1, 0, JAM2, STR_LABEL_XOFFSET, STR_LABEL_YOFFSET, NULL, "File", NULL},
+    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, BUTTON_TEXT_YOFFSET, NULL, "Parent", NULL},
+    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, BUTTON_TEXT_YOFFSET, NULL, "Drives", NULL},
+    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, BUTTON_TEXT_YOFFSET, NULL, "Open", NULL},
+    {1, 0, JAM2, BUTTON_TEXT_XOFFSET, BUTTON_TEXT_YOFFSET, NULL, "Cancel", NULL}
+};
+
 
 static WORD ok_border_points[] = {0, 0, OK_BUTTON_WIDTH, 0, OK_BUTTON_WIDTH, BUTTON_HEIGHT, 0,
                                   BUTTON_HEIGHT, 0, 0};
@@ -166,40 +176,43 @@ static struct Gadget list_vslider = {&list_up, LIST_VSLIDER_X, LIST_VSLIDER_Y,
 static struct Gadget file_text = {&list_vslider, FILE_GADGET_X, FILE_GADGET_Y,
                                   PATH_GADGET_WIDTH, PATH_GADGET_HEIGHT,
                                   GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET,
-                                  &str_gadget_border, NULL, &file_str_label, 0, &strinfo2,
+                                  &str_gadget_border, NULL, &labels[LABEL_FILE], 0, &strinfo2,
                                   REQ_FILE_TEXT_ID, NULL};
 
 static struct Gadget dir_text = {&file_text, DRAWER_GADGET_X, DRAWER_GADGET_Y,
                                  PATH_GADGET_WIDTH, PATH_GADGET_HEIGHT,
                                  GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_STRGADGET,
                                  &str_gadget_border,
-                                 NULL, &drawer_str_label, 0, &strinfo1,REQ_DIR_TEXT_ID, NULL};
+                                 NULL, &labels[LABEL_DRAWER], 0, &strinfo1,REQ_DIR_TEXT_ID, NULL};
 
 //  Note: Cancel does not specify the GACT_ENDGADGET flag, it seems that
 //  IDCMP_REQCLEAR is not fired when Intuition closes the requester automatically
 static struct Gadget cancel_button = {&dir_text, CANCEL_BUTTON_X, BUTTON_Y, CANCEL_BUTTON_WIDTH,
                                       BUTTON_HEIGHT, GFLG_GADGHCOMP, GACT_RELVERIFY,
                                       GTYP_BOOLGADGET | GTYP_REQGADGET, &cancel_button_border, NULL,
-                                      &cancel_button_label, 0, NULL, REQ_CANCEL_BUTTON_ID, NULL};
+                                      &labels[LABEL_CANCEL], 0, NULL, REQ_CANCEL_BUTTON_ID, NULL};
 
 static struct Gadget parent_button = {&cancel_button, PARENT_BUTTON_X, BUTTON_Y,
                                       PARENT_BUTTON_WIDTH, BUTTON_HEIGHT,
                                       GFLG_GADGHCOMP, GACT_RELVERIFY,
                                       GTYP_BOOLGADGET | GTYP_REQGADGET,
-                                      &parent_button_border, NULL, &parent_button_label, 0, NULL,
+                                      &parent_button_border, NULL,
+                                      &labels[LABEL_PARENT], 0, NULL,
                                       REQ_PARENT_BUTTON_ID, NULL};
 
 static struct Gadget drives_button = {&parent_button, DRIVES_BUTTON_X, BUTTON_Y,
                                       DRIVES_BUTTON_WIDTH, BUTTON_HEIGHT,
                                       GFLG_GADGHCOMP, GACT_RELVERIFY,
                                       GTYP_BOOLGADGET | GTYP_REQGADGET,
-                                      &drives_button_border, NULL, &drives_button_label, 0, NULL,
+                                      &drives_button_border, NULL,
+                                      &labels[LABEL_DRIVES], 0, NULL,
                                       REQ_DRIVES_BUTTON_ID, NULL};
 static struct Gadget ok_button = {&drives_button, OK_BUTTON_X, BUTTON_Y,
                                   OK_BUTTON_WIDTH, BUTTON_HEIGHT,
                                   GFLG_GADGHCOMP, GACT_RELVERIFY,
                                   GTYP_BOOLGADGET | GTYP_REQGADGET,
-                                  &ok_button_border, NULL, &ok_button_label, 0, NULL,
+                                  &ok_button_border, NULL,
+                                  &labels[LABEL_OPEN], 0, NULL,
                                   REQ_OK_BUTTON_ID, NULL};
 
 static int filelist_bm_depth = 1;
@@ -211,7 +224,9 @@ static char dirname[PATHBUFFER_SIZE + 1];
 static BPTR flock;
 static LONG error;
 static struct FileInfoBlock fileinfo;
+
 static struct TextFont *reqwin_font;
+static UWORD font_baseline, font_height;
 
 static void print_fileinfo(struct FileInfoBlock *fileinfo)
 {
@@ -271,6 +286,36 @@ static void cleanup()
     }
 }
 
+
+void draw_list()
+{
+    struct FileListEntry *files = scan_current_dir(), *cur;
+
+    // Note that we need to render into the requester
+    // layer's rastport, because it is rendered on top of the
+    // parent window and obscures the content
+    struct RastPort *src_rp = &filelist_rastport;
+    struct RastPort *dst_rp = requester.ReqLayer->rp;
+
+    // make sure drawing is clipped, otherwise it will
+    // draw somewhere else into memory
+    SetAPen(src_rp, 1);
+    int ypos = 10;
+
+    cur = files;
+    while (cur) {
+        Move(src_rp, 8, ypos);
+        Text(src_rp, cur->name, strlen(cur->name));
+        cur = cur->next;
+        ypos += font_height;
+        if (ypos > FILE_LIST_BM_HEIGHT) break;
+    }
+    BltBitMapRastPort(&filelist_bitmap, 0, 0, dst_rp,
+                      FILE_LIST_BM_X, FILE_LIST_BM_Y, FILE_LIST_BM_WIDTH, FILE_LIST_BM_HEIGHT,
+                      0xc0);
+    free_file_list(files);
+}
+
 void open_file(struct Window *window)
 {
     BOOL result;
@@ -287,8 +332,10 @@ void open_file(struct Window *window)
         requester.ReqText = NULL;
 
         reqwin_font = req_window->IFont;
-        printf("Font ysize: %d, baseline: %d\n", (int) reqwin_font->tf_YSize,
-               (int) reqwin_font->tf_Baseline);
+        font_height = reqwin_font->tf_YSize;
+        font_baseline = reqwin_font->tf_Baseline;
+
+        printf("Font ysize: %d, baseline: %d\n", (int) font_height, (int) font_baseline);
 
         InitBitMap(&filelist_bitmap, filelist_bm_depth, FILE_LIST_BM_WIDTH, FILE_LIST_BM_HEIGHT);
         for (int i = 0; i < filelist_bm_depth; i++) filelist_bitmap.Planes[i] = NULL;
@@ -304,52 +351,8 @@ void open_file(struct Window *window)
         InitRastPort(&filelist_rastport);
         filelist_rastport.BitMap = &filelist_bitmap;
 
-        /* scan current directory */
-        /*
-          on AmigaOS versions before 36 (essentially all 1.x versions), the
-          function GetCurrentDirName() does not exist, but it's obtainable
-          by calling Cli() and querying the returned CommandLineInterface
-          structure
-        */
-        //puts("scanning directory...");
-        /*
-        // on AmigaOS 1.x, this function does not exist !!!
-        GetCurrentDirName(dirname, PATHBUFFER_SIZE);
-        printf("current dir: '%s'\n", dirname);
-        flock = Lock(dirname, SHARED_LOCK);
-        if (Examine(flock, &fileinfo)) {
-        while (ExNext(flock, &fileinfo)) {
-        print_fileinfo(&fileinfo);
-        }
-        error = IoErr();
-        if (error != ERROR_NO_MORE_ENTRIES) {
-        puts("unknown I/O error, TODO handle");
-        }
-        }
-        UnLock(flock);
-        */
         if (req_opened = Request(&requester, req_window)) {
-            // Note that we need to render into the requester
-            // layer's rastport, because it is rendered on top of the
-            // parent window and obscures the content
-            struct RastPort *src_rp = &filelist_rastport;
-            struct RastPort *dst_rp = requester.ReqLayer->rp;
-
-            // make sure drawing is clipped, otherwise it will
-            // draw somewhere else into memory
-            SetAPen(src_rp, 1);
-            Move(src_rp, 8, 10);
-            Text(src_rp, "filename1.txt", 13);
-            Move(src_rp, 8, 20);
-            Text(src_rp, "filename2.txt", 13);
-            /*
-            BltBitMap(&filelist_bitmap, 0, 0,
-                      req_window->RPort->BitMap, 10, 10, FILE_LIST_WIDTH, FILE_LIST_HEIGHT,
-                      0xc0, 0xff, 0); // Minterm, mask, TempA
-            */
-            BltBitMapRastPort(&filelist_bitmap, 0, 0, dst_rp,
-                              FILE_LIST_BM_X, FILE_LIST_BM_Y, FILE_LIST_BM_WIDTH, FILE_LIST_BM_HEIGHT,
-                              0xc0);
+            draw_list();
             handle_events();
             CloseWindow(req_window);
             req_window = NULL;

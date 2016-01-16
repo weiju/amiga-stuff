@@ -7,6 +7,6 @@ all: main
 clean:
 	rm -f *.o main
 
-main: main.o filereq.o
+main: main.o filereq.o dos13.o
 	$(CC) $(CFLAGS) $^ -lamiga -lauto -o $@
 
