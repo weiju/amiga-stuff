@@ -1,0 +1,14 @@
+dontshout
+*.o
+.deps
+*.in
+Makefile
+*.m4
+*-h1
+autom4te.cache
+build-aux
+config.h
+config.log
+config.status
+configure
+*.tar.gz
