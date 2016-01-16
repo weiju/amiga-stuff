@@ -174,7 +174,10 @@ int main(int argc, char **argv)
     }
     ILBMData *ilbm_data = NULL;
     ilbm_data = parse_file(argv[1]);
-    if (!ilbm_data) exit(0);
+    if (!ilbm_data) {
+        puts("error reading IFF file");
+        exit(0);
+    }
     image.Width = ilbm_data->bmheader->w;
     image.Height = ilbm_data->bmheader->h;
     image.Depth = ilbm_data->bmheader->nPlanes;
@@ -184,6 +187,12 @@ int main(int argc, char **argv)
     int wordwidth = image.Width / 16;
     int finalsize = wordwidth * image.Height * image.Depth * sizeof(UWORD);
     image.ImageData = AllocMem(finalsize, MEMF_CHIP|MEMF_CLEAR);
+
+    if (!image.ImageData) {
+        puts("can't allocate chip memory for image");
+        free_ilbm_data(ilbm_data);
+        exit(0);
+    }
     ilbm_to_image_data((char *) image.ImageData, ilbm_data, image.Width, image.Height);
     image.PlanePick = (1 << image.Depth) - 1;
 
@@ -210,7 +219,8 @@ int main(int argc, char **argv)
             handle_events();
         }
     }
-    if (ilbm_data) free_ilbm_data(ilbm_data);
     cleanup();
-    return 1;
+    if (ilbm_data) free_ilbm_data(ilbm_data);
+    FreeMem(image.ImageData, finalsize);
+    return 0;
 }

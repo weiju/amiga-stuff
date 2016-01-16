@@ -2,6 +2,7 @@
 
 #include <clib/exec_protos.h>
 #include <clib/intuition_protos.h>
+#include <clib/graphics_protos.h>
 #include <clib/dos_protos.h>
 #include <clib/alib_stdio_protos.h>
 
@@ -39,8 +40,15 @@
 #define STR_LABEL_XOFFSET -60
 #define STR_LABEL_YOFFSET 2
 
+#define FILE_LIST_X     0
+#define FILE_LIST_Y     0
 #define FILE_LIST_WIDTH 229
 #define FILE_LIST_HEIGHT 86
+
+#define FILE_LIST_BM_X     1
+#define FILE_LIST_BM_Y     1
+#define FILE_LIST_BM_WIDTH (FILE_LIST_WIDTH - 2)
+#define FILE_LIST_BM_HEIGHT (FILE_LIST_HEIGHT - 2)
 
 #define LIST_VSLIDER_X FILE_LIST_WIDTH
 #define LIST_VSLIDER_Y 0
@@ -108,7 +116,8 @@ static struct Border drives_button_border = {0, 0, 1, 0, JAM1, 5, cancel_border_
 static struct Border parent_button_border = {0, 0, 1, 0, JAM1, 5, cancel_border_points, NULL};
 static struct Border cancel_button_border = {0, 0, 1, 0, JAM1, 5, cancel_border_points, NULL};
 static struct Border str_gadget_border = {0, 0, 1, 0, JAM1, 5, string_border_points, NULL};
-static struct Border file_list_border = {0, 0, 1, 0, JAM1, 5, list_border_points, NULL};
+static struct Border file_list_border = {FILE_LIST_X, FILE_LIST_Y, 1, 0, JAM1, 5,
+                                         list_border_points, NULL};
 
 static UBYTE buffer1[82], undobuffer1[82];
 static struct StringInfo strinfo1 = {buffer1, undobuffer1, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
@@ -193,11 +202,16 @@ static struct Gadget ok_button = {&drives_button, OK_BUTTON_X, BUTTON_Y,
                                   &ok_button_border, NULL, &ok_button_label, 0, NULL,
                                   REQ_OK_BUTTON_ID, NULL};
 
+static int filelist_bm_depth = 1;
+static struct BitMap filelist_bitmap;
+static struct RastPort filelist_rastport;
+
 #define PATHBUFFER_SIZE 200
 static char dirname[PATHBUFFER_SIZE + 1];
 static BPTR flock;
 static LONG error;
 static struct FileInfoBlock fileinfo;
+static struct TextFont *reqwin_font;
 
 static void print_fileinfo(struct FileInfoBlock *fileinfo)
 {
@@ -248,6 +262,15 @@ static void handle_events()
     }
 }
 
+static void cleanup()
+{
+    for (int i = 0; i < filelist_bm_depth; i++) {
+        if (filelist_bitmap.Planes[i]) FreeRaster(filelist_bitmap.Planes[i],
+                                                  FILE_LIST_WIDTH,
+                                                  FILE_LIST_HEIGHT);
+    }
+}
+
 void open_file(struct Window *window)
 {
     BOOL result;
@@ -257,11 +280,29 @@ void open_file(struct Window *window)
         requester.TopEdge = REQ_Y;
         requester.Width = REQ_WIDTH;
         requester.Height = REQ_HEIGHT;
-        requester.Flags = SIMPLEREQ;
+        requester.Flags = SIMPLEREQ | NOREQBACKFILL;
         requester.BackFill = 0;
         requester.ReqGadget = &ok_button;
         requester.ReqBorder = &file_list_border;
         requester.ReqText = NULL;
+
+        reqwin_font = req_window->IFont;
+        printf("Font ysize: %d, baseline: %d\n", (int) reqwin_font->tf_YSize,
+               (int) reqwin_font->tf_Baseline);
+
+        InitBitMap(&filelist_bitmap, filelist_bm_depth, FILE_LIST_BM_WIDTH, FILE_LIST_BM_HEIGHT);
+        for (int i = 0; i < filelist_bm_depth; i++) filelist_bitmap.Planes[i] = NULL;
+        for (int i = 0; i < filelist_bm_depth; i++) {
+            if (!(filelist_bitmap.Planes[i] = AllocRaster(FILE_LIST_WIDTH, FILE_LIST_HEIGHT))) {
+                cleanup();
+                return;
+            } else {
+                BltClear(filelist_bitmap.Planes[i],
+                         RASSIZE(FILE_LIST_WIDTH, FILE_LIST_HEIGHT), 1);
+            }
+        }
+        InitRastPort(&filelist_rastport);
+        filelist_rastport.BitMap = &filelist_bitmap;
 
         /* scan current directory */
         /*
@@ -288,12 +329,34 @@ void open_file(struct Window *window)
         UnLock(flock);
         */
         if (req_opened = Request(&requester, req_window)) {
+            // Note that we need to render into the requester
+            // layer's rastport, because it is rendered on top of the
+            // parent window and obscures the content
+            struct RastPort *src_rp = &filelist_rastport;
+            struct RastPort *dst_rp = requester.ReqLayer->rp;
+
+            // make sure drawing is clipped, otherwise it will
+            // draw somewhere else into memory
+            SetAPen(src_rp, 1);
+            Move(src_rp, 8, 10);
+            Text(src_rp, "filename1.txt", 13);
+            Move(src_rp, 8, 20);
+            Text(src_rp, "filename2.txt", 13);
+            /*
+            BltBitMap(&filelist_bitmap, 0, 0,
+                      req_window->RPort->BitMap, 10, 10, FILE_LIST_WIDTH, FILE_LIST_HEIGHT,
+                      0xc0, 0xff, 0); // Minterm, mask, TempA
+            */
+            BltBitMapRastPort(&filelist_bitmap, 0, 0, dst_rp,
+                              FILE_LIST_BM_X, FILE_LIST_BM_Y, FILE_LIST_BM_WIDTH, FILE_LIST_BM_HEIGHT,
+                              0xc0);
             handle_events();
             CloseWindow(req_window);
             req_window = NULL;
         } else {
             puts("Request() failed !!!");
         }
+        cleanup();
     } else {
         puts("OpenWindow() failed !!!");
     }
