@@ -11,6 +11,10 @@
 #include "filereq.h"
 #include "dos13.h"
 
+#define BUTTON_HMARGIN 5
+#define REQ_HMARGIN 10
+#define REQ_VMARGIN 14
+
 #define LABEL_DRAWER 0
 #define LABEL_FILE   1
 #define LABEL_PARENT 2
@@ -18,10 +22,7 @@
 #define LABEL_OPEN   4
 #define LABEL_CANCEL 5
 
-#define REQWIN_WIDTH 260
 #define REQWIN_HEIGHT 180
-#define REQ_X 10
-#define REQ_Y 16
 #define REQ_WIDTH 240
 #define REQ_HEIGHT 175
 #define TOPAZ_BASELINE 8
@@ -52,22 +53,22 @@
 
 #define FILE_LIST_X     0
 #define FILE_LIST_Y     0
-#define FILE_LIST_WIDTH 229
+//#define FILE_LIST_WIDTH 229
+
+static int filelist_width;
+static int filelist_bm_width;
+
 #define FILE_LIST_HEIGHT 86
 
 #define FILE_LIST_BM_X     1
 #define FILE_LIST_BM_Y     1
-#define FILE_LIST_BM_WIDTH (FILE_LIST_WIDTH - 2)
 #define FILE_LIST_BM_HEIGHT (FILE_LIST_HEIGHT - 2)
 
-#define LIST_VSLIDER_X FILE_LIST_WIDTH
 #define LIST_VSLIDER_Y 0
 #define LIST_VSLIDER_WIDTH 11
 #define LIST_VSLIDER_HEIGHT 65
 
-#define LIST_UP_X FILE_LIST_WIDTH
 #define LIST_UP_Y 65
-#define LIST_DOWN_X LIST_UP_X
 #define LIST_DOWN_Y (LIST_UP_Y + LIST_BUTTON_HEIGHT)
 #define LIST_BUTTON_WIDTH 11
 #define LIST_BUTTON_HEIGHT 11
@@ -113,8 +114,7 @@ static WORD drives_border_points[] = {0, 0, DRIVES_BUTTON_WIDTH, 0, DRIVES_BUTTO
 
 static WORD cancel_border_points[] = {0, 0, CANCEL_BUTTON_WIDTH, 0, CANCEL_BUTTON_WIDTH,
                                       BUTTON_HEIGHT, 0, BUTTON_HEIGHT, 0, 0};
-static WORD list_border_points[] = {0, 0, FILE_LIST_WIDTH, 0, FILE_LIST_WIDTH,
-                                    FILE_LIST_HEIGHT, 0, FILE_LIST_HEIGHT, 0, 0};
+static WORD list_border_points[] = {0, 0, 0, 0, 0, FILE_LIST_HEIGHT, 0, FILE_LIST_HEIGHT, 0, 0};
 
 /* the -2 is the margin to set to avoid that the string gadget will overdraw the
    borders */
@@ -141,17 +141,17 @@ static struct PropInfo propinfo = {AUTOKNOB | FREEVERT, 0, 0, MAXBODY, MAXBODY,
 #define WIN_TITLE "Open File..."
 
 static struct NewWindow newwin = {
-  0, 0, REQWIN_WIDTH, REQWIN_HEIGHT, 0, 1,
-  IDCMP_GADGETUP,
+  0, 0, 0, REQWIN_HEIGHT, 0, 1,
+  IDCMP_GADGETUP | IDCMP_MOUSEBUTTONS,
   WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE | WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_NOCAREREFRESH,
   NULL, NULL, WIN_TITLE,
   NULL, NULL,
-  REQWIN_WIDTH, REQWIN_HEIGHT,
-  REQWIN_WIDTH, REQWIN_HEIGHT,
+  0, REQWIN_HEIGHT,
+  0, REQWIN_HEIGHT,
   WBENCHSCREEN
 };
 
-static struct Gadget list_down = {NULL, LIST_DOWN_X, LIST_DOWN_Y,
+static struct Gadget list_down = {NULL, 0, LIST_DOWN_Y,
                                   LIST_BUTTON_WIDTH, LIST_BUTTON_HEIGHT,
                                   GFLG_GADGHCOMP | GFLG_GADGIMAGE, GACT_RELVERIFY,
                                   GTYP_BOOLGADGET | GTYP_REQGADGET,
@@ -159,7 +159,7 @@ static struct Gadget list_down = {NULL, LIST_DOWN_X, LIST_DOWN_Y,
                                   NULL, 0, NULL,
                                   REQ_DOWN_ID, NULL};
 
-static struct Gadget list_up = {&list_down, LIST_UP_X, LIST_UP_Y,
+static struct Gadget list_up = {&list_down, 0, LIST_UP_Y,
                                 LIST_BUTTON_WIDTH, LIST_BUTTON_HEIGHT,
                                 GFLG_GADGHCOMP | GFLG_GADGIMAGE, GACT_RELVERIFY,
                                 GTYP_BOOLGADGET | GTYP_REQGADGET,
@@ -167,7 +167,7 @@ static struct Gadget list_up = {&list_down, LIST_UP_X, LIST_UP_Y,
                                 NULL, 0, NULL,
                                 REQ_UP_ID, NULL};
 
-static struct Gadget list_vslider = {&list_up, LIST_VSLIDER_X, LIST_VSLIDER_Y,
+static struct Gadget list_vslider = {&list_up, 0, LIST_VSLIDER_Y,
                                      LIST_VSLIDER_WIDTH, LIST_VSLIDER_HEIGHT,
                                      GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_PROPGADGET,
                                      &slider_image, NULL, NULL, 0, &propinfo,
@@ -194,7 +194,7 @@ static struct Gadget cancel_button = {&dir_text, CANCEL_BUTTON_X, BUTTON_Y, CANC
 
 static struct Gadget parent_button = {&cancel_button, PARENT_BUTTON_X, BUTTON_Y,
                                       PARENT_BUTTON_WIDTH, BUTTON_HEIGHT,
-                                      GFLG_GADGHCOMP, GACT_RELVERIFY,
+                                      GFLG_GADGHCOMP | GFLG_DISABLED, GACT_RELVERIFY,
                                       GTYP_BOOLGADGET | GTYP_REQGADGET,
                                       &parent_button_border, NULL,
                                       &labels[LABEL_PARENT], 0, NULL,
@@ -245,6 +245,19 @@ static void close_requester()
     }
 }
 
+int file_index(int mx, int my) {
+    int x1 = REQ_HMARGIN + FILE_LIST_X;
+    int y1 = REQ_VMARGIN + FILE_LIST_Y;
+    int x2 = x1 + filelist_width;
+    int y2 = y1 + FILE_LIST_HEIGHT;
+    if (mx >= x1 && mx <= x2 && my >= y1 && my <= y2) {
+        int rely = my - y1;
+        printf("rely: %d\n", rely);
+        return 0;
+    }
+    return -1;
+}
+
 static void handle_events()
 {
     BOOL done = FALSE;
@@ -258,6 +271,15 @@ static void handle_events()
         if (msg = (struct IntuiMessage *) GetMsg(req_window->UserPort)) {
             msgClass = msg->Class;
             switch (msgClass) {
+            case IDCMP_MOUSEBUTTONS:
+                if (msg->Code == SELECTUP) {
+                    WORD mx = msg->MouseX, my = msg->MouseY, file_i = file_index(mx, my);
+                    if (file_i >= 0) {
+                        // TODO
+                    }
+                }
+                ReplyMsg((struct Message *) msg);
+                break;
             case IDCMP_GADGETUP:
                 buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
                 ReplyMsg((struct Message *) msg);
@@ -281,7 +303,7 @@ static void cleanup()
 {
     for (int i = 0; i < filelist_bm_depth; i++) {
         if (filelist_bitmap.Planes[i]) FreeRaster(filelist_bitmap.Planes[i],
-                                                  FILE_LIST_WIDTH,
+                                                  filelist_width,
                                                   FILE_LIST_HEIGHT);
     }
 }
@@ -289,7 +311,7 @@ static void cleanup()
 
 void draw_list()
 {
-    struct FileListEntry *files = scan_current_dir(), *cur;
+    struct FileListEntry *files = scan_dir(NULL), *cur;
 
     // Note that we need to render into the requester
     // layer's rastport, because it is rendered on top of the
@@ -310,42 +332,85 @@ void draw_list()
         ypos += font_height;
         if (ypos > FILE_LIST_BM_HEIGHT) break;
     }
-    BltBitMapRastPort(&filelist_bitmap, 0, 0, dst_rp,
-                      FILE_LIST_BM_X, FILE_LIST_BM_Y, FILE_LIST_BM_WIDTH, FILE_LIST_BM_HEIGHT,
-                      0xc0);
+    SetDrMd(src_rp, COMPLEMENT);
+    // Draw selection rectangle
+    RectFill(src_rp, 8, 12, filelist_bm_width - 8, 18);
     free_file_list(files);
+
+    // Done drawing, offscreen bitmap is rendered, copy to the requester's layer
+    ClipBlit(src_rp, 0, 0, dst_rp,
+            FILE_LIST_BM_X, FILE_LIST_BM_Y, filelist_bm_width, FILE_LIST_BM_HEIGHT,
+            0xc0);
+}
+
+// Initialize the requester window and gadget sizes
+// according to the current font and screen resolutions
+void init_sizes(struct Window *window, struct Requester *requester)
+{
+    int scrw = window->WScreen->Width;
+    int scrh = window->WScreen->Height;
+    // Determine the width of the requester. This is
+    // the maximum of the width of the button bar and
+    // the file list.
+    // The width of the file list is the width to hold 30 characters
+    // in the current font
+    filelist_width = TextLength(window->RPort, "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW", 30) + 10;
+    filelist_bm_width = filelist_width - 2;
+
+    int buttonbar_width = TextLength(window->RPort, "OpenDrivesParentCancel", 22)
+        + (BUTTON_HMARGIN * 2 * 4);
+    int req_width = filelist_width > buttonbar_width ? filelist_width : buttonbar_width;
+    printf("filelist width: %d, button bar width: %d, req_width: %d\n", filelist_width,
+           buttonbar_width, req_width);
+    req_width += LIST_VSLIDER_WIDTH;
+
+    newwin.MinWidth = newwin.MaxWidth = newwin.Width = req_width + 2 * REQ_HMARGIN;
+    // TODO: respect screen size
+    newwin.LeftEdge = window->LeftEdge + 10;
+    newwin.TopEdge = window->TopEdge + 10;
+
+    // adjust border
+    list_border_points[2] = filelist_width;
+    list_border_points[4] = filelist_width;
+    // adjust gadgets
+    list_down.LeftEdge = filelist_width;
+    list_up.LeftEdge = filelist_width;
+    list_vslider.LeftEdge = filelist_width;
+
+    requester->Width = req_width;
+    requester->LeftEdge = REQ_HMARGIN;
+    requester->TopEdge = REQ_VMARGIN;
+    requester->Height = REQ_HEIGHT;
+    requester->Flags = SIMPLEREQ | NOREQBACKFILL | NOISYREQ;
+    requester->BackFill = 0;
+    requester->ReqGadget = &ok_button;
+    requester->ReqBorder = &file_list_border;
+    requester->ReqText = NULL;
 }
 
 void open_file(struct Window *window)
 {
     BOOL result;
+    InitRequester(&requester);
+    init_sizes(window, &requester);
     if (req_window = OpenWindow(&newwin)) {
-        InitRequester(&requester);
-        requester.LeftEdge = REQ_X;
-        requester.TopEdge = REQ_Y;
-        requester.Width = REQ_WIDTH;
-        requester.Height = REQ_HEIGHT;
-        requester.Flags = SIMPLEREQ | NOREQBACKFILL;
-        requester.BackFill = 0;
-        requester.ReqGadget = &ok_button;
-        requester.ReqBorder = &file_list_border;
-        requester.ReqText = NULL;
-
         reqwin_font = req_window->IFont;
         font_height = reqwin_font->tf_YSize;
         font_baseline = reqwin_font->tf_Baseline;
 
         printf("Font ysize: %d, baseline: %d\n", (int) font_height, (int) font_baseline);
 
-        InitBitMap(&filelist_bitmap, filelist_bm_depth, FILE_LIST_BM_WIDTH, FILE_LIST_BM_HEIGHT);
+        // TODO: the offline bitmap should be higher by one text line than the
+        // visible area, since clipping doesn't work easily on drawing text
+        InitBitMap(&filelist_bitmap, filelist_bm_depth, filelist_bm_width, FILE_LIST_BM_HEIGHT);
         for (int i = 0; i < filelist_bm_depth; i++) filelist_bitmap.Planes[i] = NULL;
         for (int i = 0; i < filelist_bm_depth; i++) {
-            if (!(filelist_bitmap.Planes[i] = AllocRaster(FILE_LIST_WIDTH, FILE_LIST_HEIGHT))) {
+            if (!(filelist_bitmap.Planes[i] = AllocRaster(filelist_width, FILE_LIST_HEIGHT))) {
                 cleanup();
                 return;
             } else {
                 BltClear(filelist_bitmap.Planes[i],
-                         RASSIZE(FILE_LIST_WIDTH, FILE_LIST_HEIGHT), 1);
+                         RASSIZE(filelist_width, FILE_LIST_HEIGHT), 1);
             }
         }
         InitRastPort(&filelist_rastport);

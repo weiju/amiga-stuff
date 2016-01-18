@@ -23,9 +23,10 @@ struct FileListEntry {
 };
 
 /*
- * scan the current directory
+ * Scans the specified directory and returns the entries, if dirpath is NULL,
+ * returns the list of all logical volumes.
  */
-extern struct FileListEntry *scan_current_dir();
+extern struct FileListEntry *scan_dir(const char *dirpath);
 
 /* free the resources allocated in the specified entry list */
 void free_file_list(struct FileListEntry *entries);

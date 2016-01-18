@@ -26,7 +26,7 @@ extern struct Library *DOSBase;
   For now, we will omit device typed entries, because writing/reading to them
   usually doesn't make too much sense.
 */
-struct FileListEntry *scan_current_dir()
+struct FileListEntry *scan_dir(const char *dirpath)
 {
     struct DosLibrary *dosbase = (struct DosLibrary *) DOSBase;
     Forbid();
