@@ -15,6 +15,33 @@
 #define REQ_HMARGIN 10
 #define REQ_VMARGIN 14
 
+#define FILE_LIST_HMARGIN   5
+#define FILE_LIST_VMARGIN   3
+#define FILE_LIST_LINE_DIST 1
+
+#define NUM_FILE_ENTRIES 10
+
+static int filelist_width;
+static int filelist_height;
+static int filelist_bm_width;
+static int filelist_bm_height;
+
+#define FILE_LIST_HEIGHT 86
+
+#define FILE_LIST_BM_X     1
+#define FILE_LIST_BM_Y     1
+#define FILE_LIST_BM_HEIGHT (FILE_LIST_HEIGHT - 2)
+
+#define LIST_VSLIDER_Y 0
+#define LIST_VSLIDER_WIDTH 11
+// not sure about the + 1 ??
+#define LIST_VSLIDER_HEIGHT (FILE_LIST_HEIGHT - 2 * 11 + 1)
+
+#define LIST_UP_Y 65
+#define LIST_DOWN_Y (LIST_UP_Y + LIST_BUTTON_HEIGHT)
+#define LIST_BUTTON_WIDTH 11
+#define LIST_BUTTON_HEIGHT 11
+
 #define LABEL_DRAWER 0
 #define LABEL_FILE   1
 #define LABEL_PARENT 2
@@ -23,7 +50,6 @@
 #define LABEL_CANCEL 5
 
 #define REQWIN_HEIGHT 180
-#define REQ_WIDTH 240
 #define REQ_HEIGHT 175
 #define TOPAZ_BASELINE 8
 
@@ -51,27 +77,6 @@
 #define STR_LABEL_XOFFSET -60
 #define STR_LABEL_YOFFSET 2
 
-#define FILE_LIST_X     0
-#define FILE_LIST_Y     0
-//#define FILE_LIST_WIDTH 229
-
-static int filelist_width;
-static int filelist_bm_width;
-
-#define FILE_LIST_HEIGHT 86
-
-#define FILE_LIST_BM_X     1
-#define FILE_LIST_BM_Y     1
-#define FILE_LIST_BM_HEIGHT (FILE_LIST_HEIGHT - 2)
-
-#define LIST_VSLIDER_Y 0
-#define LIST_VSLIDER_WIDTH 11
-#define LIST_VSLIDER_HEIGHT 65
-
-#define LIST_UP_Y 65
-#define LIST_DOWN_Y (LIST_UP_Y + LIST_BUTTON_HEIGHT)
-#define LIST_BUTTON_WIDTH 11
-#define LIST_BUTTON_HEIGHT 11
 
 #define REQ_OK_BUTTON_ID     101
 #define REQ_DRIVES_BUTTON_ID 102
@@ -126,8 +131,7 @@ static struct Border drives_button_border = {0, 0, 1, 0, JAM1, 5, cancel_border_
 static struct Border parent_button_border = {0, 0, 1, 0, JAM1, 5, cancel_border_points, NULL};
 static struct Border cancel_button_border = {0, 0, 1, 0, JAM1, 5, cancel_border_points, NULL};
 static struct Border str_gadget_border = {0, 0, 1, 0, JAM1, 5, string_border_points, NULL};
-static struct Border file_list_border = {FILE_LIST_X, FILE_LIST_Y, 1, 0, JAM1, 5,
-                                         list_border_points, NULL};
+static struct Border file_list_border = {0, 0, 1, 0, JAM1, 5, list_border_points, NULL};
 
 static UBYTE buffer1[82], undobuffer1[82];
 static struct StringInfo strinfo1 = {buffer1, undobuffer1, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
@@ -246,8 +250,8 @@ static void close_requester()
 }
 
 int file_index(int mx, int my) {
-    int x1 = REQ_HMARGIN + FILE_LIST_X;
-    int y1 = REQ_VMARGIN + FILE_LIST_Y;
+    int x1 = REQ_HMARGIN;
+    int y1 = REQ_VMARGIN;
     int x2 = x1 + filelist_width;
     int y2 = y1 + FILE_LIST_HEIGHT;
     if (mx >= x1 && mx <= x2 && my >= y1 && my <= y2) {
@@ -343,19 +347,25 @@ void draw_list()
             0xc0);
 }
 
-// Initialize the requester window and gadget sizes
-// according to the current font and screen resolutions
+/* Initialize the requester window and gadget sizes according to the current font and
+   screen resolutions. The window parameter is used to determine the font and the parent
+   window position.
+*/
 void init_sizes(struct Window *window, struct Requester *requester)
 {
     int scrw = window->WScreen->Width;
     int scrh = window->WScreen->Height;
-    // Determine the width of the requester. This is
-    // the maximum of the width of the button bar and
-    // the file list.
-    // The width of the file list is the width to hold 30 characters
-    // in the current font
+
+    // Determine the requester's dimensions
     filelist_width = TextLength(window->RPort, "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW", 30) + 10;
     filelist_bm_width = filelist_width - 2;
+    struct TextFont *font = window->IFont;
+    int font_height = font->tf_YSize;
+    int font_baseline = font->tf_Baseline;
+    filelist_height = font_height * NUM_FILE_ENTRIES + 2 * FILE_LIST_VMARGIN +
+        (NUM_FILE_ENTRIES - 1) * FILE_LIST_LINE_DIST;
+    printf("Font ysize: %d, list height: %d\n", (int) font_height, filelist_height);
+
 
     int buttonbar_width = TextLength(window->RPort, "OpenDrivesParentCancel", 22)
         + (BUTTON_HMARGIN * 2 * 4);
@@ -365,6 +375,8 @@ void init_sizes(struct Window *window, struct Requester *requester)
     req_width += LIST_VSLIDER_WIDTH;
 
     newwin.MinWidth = newwin.MaxWidth = newwin.Width = req_width + 2 * REQ_HMARGIN;
+
+    // position the requester relative to the parent window
     // TODO: respect screen size
     newwin.LeftEdge = window->LeftEdge + 10;
     newwin.TopEdge = window->TopEdge + 10;
@@ -400,8 +412,9 @@ void open_file(struct Window *window)
 
         printf("Font ysize: %d, baseline: %d\n", (int) font_height, (int) font_baseline);
 
-        // TODO: the offline bitmap should be higher by one text line than the
-        // visible area, since clipping doesn't work easily on drawing text
+        // TODO: we are scrolling by whole lines, this way we can avoid
+        // corrupting memory by drawing over the offline bitmap memory
+        // we copy the previous content a line up/down and insert the new line
         InitBitMap(&filelist_bitmap, filelist_bm_depth, filelist_bm_width, FILE_LIST_BM_HEIGHT);
         for (int i = 0; i < filelist_bm_depth; i++) filelist_bitmap.Planes[i] = NULL;
         for (int i = 0; i < filelist_bm_depth; i++) {
