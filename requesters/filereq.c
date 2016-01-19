@@ -19,10 +19,9 @@
 #define FILE_LIST_VMARGIN   3
 #define FILE_LIST_LINE_DIST 1
 #define LIST_VSLIDER_WIDTH 11
-#define LIST_BUTTON_WIDTH 11
+#define LIST_BUTTON_WIDTH  11
 #define LIST_BUTTON_HEIGHT 11
-#define FILE_LIST_BM_X     1
-#define FILE_LIST_BM_Y     1
+#define FILE_LIST_BM_MARGIN 1
 
 #define NUM_FILE_ENTRIES 10
 
@@ -32,10 +31,12 @@ static int filelist_height;
 static int filelist_bm_width;
 static int filelist_bm_height;
 
+static int select_index = 1;
+
 enum { LABEL_DRAWER = 0, LABEL_FILE, LABEL_PARENT, LABEL_DRIVES, LABEL_OPEN, LABEL_CANCEL } Labels;
 
-#define REQWIN_HEIGHT 180
 #define REQ_HEIGHT 175
+#define REQWIN_HEIGHT (REQ_HEIGHT + 5)
 #define TOPAZ_BASELINE 8
 
 #define DRAWER_GADGET_X  60
@@ -290,7 +291,6 @@ static void cleanup()
     }
 }
 
-
 void draw_list()
 {
     struct FileListEntry *files = scan_dir(NULL), *cur;
@@ -304,24 +304,28 @@ void draw_list()
     // make sure drawing is clipped, otherwise it will
     // draw somewhere else into memory
     SetAPen(src_rp, 1);
-    int ypos = 10;
+    int ypos = FILE_LIST_VMARGIN + font_baseline;
 
     cur = files;
-    while (cur) {
+    int count = 0;
+    while (cur && count < NUM_FILE_ENTRIES) {
         Move(src_rp, 8, ypos);
         Text(src_rp, cur->name, strlen(cur->name));
         cur = cur->next;
-        ypos += font_height;
-        if (ypos > filelist_bm_height) break;
+        ypos += font_height + FILE_LIST_LINE_DIST;
+        count++;
     }
-    SetDrMd(src_rp, COMPLEMENT);
+
     // Draw selection rectangle
-    RectFill(src_rp, 8, 12, filelist_bm_width - 8, 18);
+    SetDrMd(src_rp, COMPLEMENT);
+    int y1 = FILE_LIST_VMARGIN + select_index * (font_height + FILE_LIST_LINE_DIST) - 1;
+    int y2 = y1 + font_height;
+    RectFill(src_rp, 0, y1, filelist_bm_width, y2);
     free_file_list(files);
 
     // Done drawing, offscreen bitmap is rendered, copy to the requester's layer
     ClipBlit(src_rp, 0, 0, dst_rp,
-            FILE_LIST_BM_X, FILE_LIST_BM_Y, filelist_bm_width, filelist_bm_height,
+            FILE_LIST_BM_MARGIN, FILE_LIST_BM_MARGIN, filelist_bm_width, filelist_bm_height,
             0xc0);
 }
 
@@ -341,9 +345,9 @@ void init_sizes(struct Window *window, struct Requester *requester)
     struct TextFont *font = window->IFont;
     int font_height = font->tf_YSize;
     int font_baseline = font->tf_Baseline;
-    filelist_height = font_height * NUM_FILE_ENTRIES + 2 * FILE_LIST_VMARGIN +
+    filelist_bm_height = font_height * NUM_FILE_ENTRIES + 2 * FILE_LIST_VMARGIN +
         (NUM_FILE_ENTRIES - 1) * FILE_LIST_LINE_DIST;
-    filelist_bm_height = filelist_height + 2;
+    filelist_height = filelist_bm_height + (FILE_LIST_BM_MARGIN * 2);
 
     // controls at the right of the list
     int filelist_vslider_height = filelist_height - 2 * LIST_BUTTON_HEIGHT + 1;
