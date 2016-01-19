@@ -30,7 +30,7 @@ static int filelist_width;
 static int filelist_height;
 static int filelist_bm_width;
 static int filelist_bm_height;
-
+static struct FileListEntry *current_files;
 static int select_index = 1;
 
 enum { LABEL_DRAWER = 0, LABEL_FILE, LABEL_PARENT, LABEL_DRIVES, LABEL_OPEN, LABEL_CANCEL } Labels;
@@ -230,15 +230,32 @@ static void close_requester()
 
 int file_index(int mx, int my) {
     int x1 = REQ_HMARGIN;
-    int y1 = REQ_VMARGIN;
+    int y1 = REQ_VMARGIN + FILE_LIST_VMARGIN + FILE_LIST_BM_MARGIN;
     int x2 = x1 + filelist_width;
     int y2 = y1 + filelist_height;
     if (mx >= x1 && mx <= x2 && my >= y1 && my <= y2) {
         int rely = my - y1;
-        printf("rely: %d\n", rely);
-        return 0;
+        int index = rely / (font_height + FILE_LIST_LINE_DIST);
+        //printf("rely: %d, new sel index: %d\n", rely, index);
+        return index < NUM_FILE_ENTRIES ? index : -1;
     }
     return -1;
+}
+
+static void render_list_backbuffer()
+{
+    ClipBlit(&filelist_rastport, 0, 0, requester.ReqLayer->rp,
+             FILE_LIST_BM_MARGIN, FILE_LIST_BM_MARGIN, filelist_bm_width, filelist_bm_height,
+             0xc0);
+}
+
+static void draw_selection(struct RastPort *src_rp)
+{
+    // Draw selection rectangle
+    SetDrMd(src_rp, COMPLEMENT);
+    int y1 = FILE_LIST_VMARGIN + select_index * (font_height + FILE_LIST_LINE_DIST) - FILE_LIST_BM_MARGIN;
+    int y2 = y1 + font_height;
+    RectFill(src_rp, 0, y1, filelist_bm_width, y2);
 }
 
 static void handle_events()
@@ -256,9 +273,13 @@ static void handle_events()
             switch (msgClass) {
             case IDCMP_MOUSEBUTTONS:
                 if (msg->Code == SELECTUP) {
+                    // TODO: map to virtual file list indexes
                     WORD mx = msg->MouseX, my = msg->MouseY, file_i = file_index(mx, my);
-                    if (file_i >= 0) {
-                        // TODO
+                    if (file_i >= 0 && file_i != select_index) {
+                        draw_selection(&filelist_rastport);
+                        select_index = file_i;
+                        draw_selection(&filelist_rastport);
+                        render_list_backbuffer();
                     }
                 }
                 ReplyMsg((struct Message *) msg);
@@ -291,10 +312,16 @@ static void cleanup()
     }
 }
 
-void draw_list()
+static void clear_list()
 {
-    struct FileListEntry *files = scan_dir(NULL), *cur;
+    for (int i = 0; i < filelist_bm_depth; i++) {
+        BltClear(filelist_bitmap.Planes[i],
+                 RASSIZE(filelist_width, filelist_height), 1);
+    }
+}
 
+static void draw_list()
+{
     // Note that we need to render into the requester
     // layer's rastport, because it is rendered on top of the
     // parent window and obscures the content
@@ -306,7 +333,7 @@ void draw_list()
     SetAPen(src_rp, 1);
     int ypos = FILE_LIST_VMARGIN + font_baseline;
 
-    cur = files;
+    struct FileListEntry *cur = current_files;
     int count = 0;
     while (cur && count < NUM_FILE_ENTRIES) {
         Move(src_rp, 8, ypos);
@@ -316,17 +343,10 @@ void draw_list()
         count++;
     }
 
-    // Draw selection rectangle
-    SetDrMd(src_rp, COMPLEMENT);
-    int y1 = FILE_LIST_VMARGIN + select_index * (font_height + FILE_LIST_LINE_DIST) - 1;
-    int y2 = y1 + font_height;
-    RectFill(src_rp, 0, y1, filelist_bm_width, y2);
-    free_file_list(files);
+    draw_selection(src_rp);
 
     // Done drawing, offscreen bitmap is rendered, copy to the requester's layer
-    ClipBlit(src_rp, 0, 0, dst_rp,
-            FILE_LIST_BM_MARGIN, FILE_LIST_BM_MARGIN, filelist_bm_width, filelist_bm_height,
-            0xc0);
+    render_list_backbuffer();
 }
 
 /* Initialize the requester window and gadget sizes according to the current font and
@@ -417,16 +437,17 @@ void open_file(struct Window *window)
                 cleanup();
                 return;
             } else {
-                BltClear(filelist_bitmap.Planes[i],
-                         RASSIZE(filelist_width, filelist_height), 1);
+                clear_list();
             }
         }
         InitRastPort(&filelist_rastport);
         filelist_rastport.BitMap = &filelist_bitmap;
 
         if (req_opened = Request(&requester, req_window)) {
+            current_files = scan_dir(NULL);
             draw_list();
             handle_events();
+            free_file_list(current_files);
             CloseWindow(req_window);
             req_window = NULL;
         } else {
