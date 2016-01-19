@@ -31,6 +31,7 @@ static int filelist_height;
 static int filelist_bm_width;
 static int filelist_bm_height;
 static struct FileListEntry *current_files;
+static int num_current_files;
 static int select_index = 1;
 
 enum { LABEL_DRAWER = 0, LABEL_FILE, LABEL_PARENT, LABEL_DRIVES, LABEL_OPEN, LABEL_CANCEL } Labels;
@@ -208,7 +209,6 @@ static BPTR flock;
 static LONG error;
 static struct FileInfoBlock fileinfo;
 
-static struct TextFont *reqwin_font;
 static UWORD font_baseline, font_height;
 
 static void print_fileinfo(struct FileInfoBlock *fileinfo)
@@ -363,8 +363,8 @@ void init_sizes(struct Window *window, struct Requester *requester)
     filelist_width = filelist_bm_width + 2;
 
     struct TextFont *font = window->IFont;
-    int font_height = font->tf_YSize;
-    int font_baseline = font->tf_Baseline;
+    font_height = font->tf_YSize;
+    font_baseline = font->tf_Baseline;
     filelist_bm_height = font_height * NUM_FILE_ENTRIES + 2 * FILE_LIST_VMARGIN +
         (NUM_FILE_ENTRIES - 1) * FILE_LIST_LINE_DIST;
     filelist_height = filelist_bm_height + (FILE_LIST_BM_MARGIN * 2);
@@ -421,12 +421,6 @@ void open_file(struct Window *window)
     InitRequester(&requester);
     init_sizes(window, &requester);
     if (req_window = OpenWindow(&newwin)) {
-        reqwin_font = req_window->IFont;
-        font_height = reqwin_font->tf_YSize;
-        font_baseline = reqwin_font->tf_Baseline;
-
-        printf("Font ysize: %d, baseline: %d\n", (int) font_height, (int) font_baseline);
-
         // TODO: we are scrolling by whole lines, this way we can avoid
         // corrupting memory by drawing over the offline bitmap memory
         // we copy the previous content a line up/down and insert the new line
@@ -444,7 +438,19 @@ void open_file(struct Window *window)
         filelist_rastport.BitMap = &filelist_bitmap;
 
         if (req_opened = Request(&requester, req_window)) {
-            current_files = scan_dir(NULL);
+            current_files = scan_dir(NULL, &num_current_files);
+            // set the length of the slider thumb according to the current file list
+            int vertbody = MAXBODY;
+            int vertpot = MAXBODY;
+            if (num_current_files > NUM_FILE_ENTRIES) {
+                // because we can only use integer division, so we have to determine
+                // the body size by solving the equation
+                // MAXBODY / vertbody = num_current_files / NUM_FILE_ENTRIES
+                vertbody = (MAXBODY * NUM_FILE_ENTRIES) / num_current_files;
+                vertpot = select_index * (MAXBODY / num_current_files);
+            }
+            NewModifyProp(&list_vslider, req_window, &requester, AUTOKNOB | FREEVERT,
+                          0, vertpot, MAXBODY, vertbody, 1);
             draw_list();
             handle_events();
             free_file_list(current_files);

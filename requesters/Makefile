@@ -9,4 +9,3 @@ clean:
 
 main: main.o filereq.o dos13.o
 	$(CC) $(CFLAGS) $^ -lamiga -lauto -o $@
-

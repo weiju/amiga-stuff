@@ -26,7 +26,7 @@ extern struct Library *DOSBase;
   For now, we will omit device typed entries, because writing/reading to them
   usually doesn't make too much sense.
 */
-struct FileListEntry *scan_dir(const char *dirpath)
+struct FileListEntry *scan_dir(const char *dirpath, int *num_entries)
 {
     struct DosLibrary *dosbase = (struct DosLibrary *) DOSBase;
     Forbid();
@@ -34,6 +34,7 @@ struct FileListEntry *scan_dir(const char *dirpath)
     struct DevInfo *dev_head = BADDR(dosinfo->di_DevInfo);
     struct DevInfo *current = dev_head;
     struct FileListEntry *cur_entry = NULL, *result = NULL, *tmp;
+    int n = 0;
     char fname_len;
 
     while (current) {
@@ -49,6 +50,7 @@ struct FileListEntry *scan_dir(const char *dirpath)
                 cur_entry->next = tmp;
                 cur_entry = tmp;
             }
+            n++;
         }
         current = BADDR(current->dvi_Next);
     }
@@ -80,6 +82,7 @@ struct FileListEntry *scan_dir(const char *dirpath)
     /* The result is an unsorted list, which is usually not what we want.
        TODO: sort the list
      */
+    *num_entries = n;
     return result;
 }
 
