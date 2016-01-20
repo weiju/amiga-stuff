@@ -48,6 +48,7 @@ struct FileListEntry *scan_dir(const char *dirpath, int *num_entries)
             if (!cur_entry) result = cur_entry = tmp;
             else {
                 cur_entry->next = tmp;
+                tmp->prev = cur_entry;
                 cur_entry = tmp;
             }
             n++;

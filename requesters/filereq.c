@@ -33,6 +33,13 @@ static int filelist_bm_height;
 static struct FileListEntry *current_files;
 static int num_current_files;
 static int select_index = 1;
+static int slider_increment;
+
+/*
+ * The first visible entry in the file list. Since the
+ * number of visible entries is fixed, we only need this one.
+ */
+static struct FileListEntry *first_visible_entry;
 
 enum { LABEL_DRAWER = 0, LABEL_FILE, LABEL_PARENT, LABEL_DRIVES, LABEL_OPEN, LABEL_CANCEL } Labels;
 
@@ -66,8 +73,8 @@ enum { LABEL_DRAWER = 0, LABEL_FILE, LABEL_PARENT, LABEL_DRIVES, LABEL_OPEN, LAB
 
 enum {
     REQ_OK_BUTTON_ID = 101, REQ_DRIVES_BUTTON_ID, REQ_PARENT_BUTTON_ID,
-    REQ_CANCEL_BUTTON_ID, REQ_DIR_TEXT_ID, REQ_FILE_TEXT_ID, REQ_VSLIDER_ID,
-    REQ_UP_ID, REQ_DOWN_ID
+    REQ_CANCEL_BUTTON_ID, REQ_DIR_TEXT_ID, REQ_FILE_TEXT_ID, VSLIDER_ID,
+    LIST_UP_ID, LIST_DOWN_ID
 } GadgetIDs;
 
 static struct Requester requester;
@@ -127,7 +134,7 @@ static struct PropInfo propinfo = {AUTOKNOB | FREEVERT, 0, 0, MAXBODY, MAXBODY,
 
 static struct NewWindow newwin = {
   0, 0, 0, REQWIN_HEIGHT, 0, 1,
-  IDCMP_GADGETUP | IDCMP_MOUSEBUTTONS,
+  IDCMP_GADGETUP | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE,
   WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE | WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_NOCAREREFRESH,
   NULL, NULL, WIN_TITLE,
   NULL, NULL,
@@ -142,7 +149,7 @@ static struct Gadget list_down = {NULL, 0, 0,
                                   GTYP_BOOLGADGET | GTYP_REQGADGET,
                                   &down_image, NULL,
                                   NULL, 0, NULL,
-                                  REQ_DOWN_ID, NULL};
+                                  LIST_DOWN_ID, NULL};
 
 static struct Gadget list_up = {&list_down, 0, 0,
                                 LIST_BUTTON_WIDTH, LIST_BUTTON_HEIGHT,
@@ -150,12 +157,12 @@ static struct Gadget list_up = {&list_down, 0, 0,
                                 GTYP_BOOLGADGET | GTYP_REQGADGET,
                                 &up_image, NULL,
                                 NULL, 0, NULL,
-                                REQ_UP_ID, NULL};
+                                LIST_UP_ID, NULL};
 
 static struct Gadget list_vslider = {&list_up, 0, 0, LIST_VSLIDER_WIDTH, 0,
-                                     GFLG_GADGHCOMP, GACT_RELVERIFY, GTYP_PROPGADGET,
+                                     GFLG_GADGHCOMP, GACT_RELVERIFY|GACT_FOLLOWMOUSE, GTYP_PROPGADGET,
                                      &slider_image, NULL, NULL, 0, &propinfo,
-                                     REQ_VSLIDER_ID, NULL};
+                                     VSLIDER_ID, NULL};
 
 static struct Gadget file_text = {&list_vslider, FILE_GADGET_X, FILE_GADGET_Y,
                                   PATH_GADGET_WIDTH, PATH_GADGET_HEIGHT,
@@ -265,12 +272,39 @@ static void handle_events()
     ULONG msgClass;
     UWORD menuCode;
     int buttonId;
+    ULONG last_seconds, last_micros, seconds, micros;
+    int idx;
+    BOOL movestart = FALSE;
 
     while (!done) {
         Wait(1 << req_window->UserPort->mp_SigBit);
-        if (msg = (struct IntuiMessage *) GetMsg(req_window->UserPort)) {
+        // since we expect mouse move operations, we need to process all events until
+        // the message queue is empty, otherwise we'll get funny effects by processing
+        // the queued up mouse move events when we actually were notified about a different
+        // event
+        while (msg = (struct IntuiMessage *) GetMsg(req_window->UserPort)) {
             msgClass = msg->Class;
             switch (msgClass) {
+            case IDCMP_MOUSEMOVE:
+                if (!movestart) {
+                    CurrentTime(&last_seconds, &last_micros);
+                    movestart = TRUE;
+                } else {
+                    CurrentTime(&seconds, &micros);
+                    ULONG diff = (seconds - last_seconds) * 1000 + (micros - last_micros) / 1000;
+                    if (diff > 300) {
+                        // update the list, but ignore most of the move events,
+                        // otherwise the we need to  process too many events and
+                        // refresh too often
+                        idx = propinfo.VertPot / slider_increment;
+                        printf("gadget up, vslider, vertpot: %d, incr: %d, idx: %d\n",
+                               (int) propinfo.VertPot, slider_increment, idx);
+                        last_seconds = seconds;
+                        last_micros = micros;
+                    }
+                }
+                ReplyMsg((struct Message *) msg);
+                break;
             case IDCMP_MOUSEBUTTONS:
                 if (msg->Code == SELECTUP) {
                     // TODO: map to virtual file list indexes
@@ -287,13 +321,30 @@ static void handle_events()
             case IDCMP_GADGETUP:
                 buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
                 ReplyMsg((struct Message *) msg);
-                if (buttonId == REQ_OK_BUTTON_ID) {
+                switch (buttonId) {
+                case REQ_OK_BUTTON_ID:
                     close_requester();
                     done = TRUE;
-                }
-                else if (buttonId == REQ_CANCEL_BUTTON_ID) {
+                    break;
+                case REQ_CANCEL_BUTTON_ID:
                     close_requester();
                     done = TRUE;
+                    break;
+                case LIST_UP_ID:
+                    // TODO: adjust the vertpot by the increment
+                    // update first_visible_entry and
+                    break;
+                case LIST_DOWN_ID:
+                    break;
+                case VSLIDER_ID:
+                    // determine the portion to be displayed
+                    idx = propinfo.VertPot / slider_increment;
+                    printf("gadget up, vslider, vertpot: %d, incr: %d, idx: %d\n",
+                           (int) propinfo.VertPot, slider_increment, idx);
+                    movestart = FALSE;
+                    break;
+                default:
+                    break;
                 }
                 break;
             default:
@@ -320,6 +371,11 @@ static void clear_list()
     }
 }
 
+/*
+ * Render the currently visible portion of the current file list.
+ * We can simply clear the whole thing and render the visible
+ * entries.
+ */
 static void draw_list()
 {
     // Note that we need to render into the requester
@@ -333,7 +389,7 @@ static void draw_list()
     SetAPen(src_rp, 1);
     int ypos = FILE_LIST_VMARGIN + font_baseline;
 
-    struct FileListEntry *cur = current_files;
+    struct FileListEntry *cur = first_visible_entry;
     int count = 0;
     while (cur && count < NUM_FILE_ENTRIES) {
         Move(src_rp, 8, ypos);
@@ -421,9 +477,6 @@ void open_file(struct Window *window)
     InitRequester(&requester);
     init_sizes(window, &requester);
     if (req_window = OpenWindow(&newwin)) {
-        // TODO: we are scrolling by whole lines, this way we can avoid
-        // corrupting memory by drawing over the offline bitmap memory
-        // we copy the previous content a line up/down and insert the new line
         InitBitMap(&filelist_bitmap, filelist_bm_depth, filelist_bm_width, filelist_bm_height);
         for (int i = 0; i < filelist_bm_depth; i++) filelist_bitmap.Planes[i] = NULL;
         for (int i = 0; i < filelist_bm_depth; i++) {
@@ -439,6 +492,7 @@ void open_file(struct Window *window)
 
         if (req_opened = Request(&requester, req_window)) {
             current_files = scan_dir(NULL, &num_current_files);
+            first_visible_entry = current_files;
             // set the length of the slider thumb according to the current file list
             int vertbody = MAXBODY;
             int vertpot = MAXBODY;
@@ -447,7 +501,8 @@ void open_file(struct Window *window)
                 // the body size by solving the equation
                 // MAXBODY / vertbody = num_current_files / NUM_FILE_ENTRIES
                 vertbody = (MAXBODY * NUM_FILE_ENTRIES) / num_current_files;
-                vertpot = select_index * (MAXBODY / num_current_files);
+                slider_increment = (MAXBODY / num_current_files);
+                vertpot = select_index * slider_increment;
             }
             NewModifyProp(&list_vslider, req_window, &requester, AUTOKNOB | FREEVERT,
                           0, vertpot, MAXBODY, vertbody, 1);

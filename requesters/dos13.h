@@ -14,10 +14,11 @@
 #define MAX_FILENAME_LEN 31
 
 /*
- * Store file list entries in these entries.
+ * Store file list entries in these entries. Storing a previous pointer allows us to
+ * navigate backwards, e.g. for scrolling up a file list.
  */
 struct FileListEntry {
-    struct FileListEntry *next;
+    struct FileListEntry *next, *prev;
     UWORD file_type;
     char name[MAX_FILENAME_LEN + 1];
 };

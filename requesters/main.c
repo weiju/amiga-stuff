@@ -143,7 +143,6 @@ static void setup_menu()
     itemHeight = txHeight + 2;  /* 2 pixels adjustment */
 
     numItems = sizeof(fileMenuItems) / sizeof(struct MenuItem);
-    printf("# file items: %d\n", (int) numItems);
     for (i = 0; i < numItems; i++) {
         fileMenuItems[i].TopEdge = i * itemHeight;
         fileMenuItems[i].Height = itemHeight;
