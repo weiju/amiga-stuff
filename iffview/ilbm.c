@@ -102,7 +102,7 @@ void read_CRNG(FILE *fp, int datasize)
 UBYTE *read_BODY(FILE *fp, int datasize, BitMapHeader *bmheader, int *data_bytes)
 {
   ULONG bytes_read;
-  BYTE *buffer, *dst_buffer;
+  UBYTE *buffer, *dst_buffer;
   int src_i = 0, dst_i = 0, dst_size;
 
   buffer = malloc(datasize);
@@ -153,11 +153,11 @@ ILBMData *read_chunks(FILE *fp, int filesize, int total_read)
 #else
         datasize = *((ULONG *) &buffer[4]);
 #endif
-        if (!strncmp("BMHD", buffer, 4)) bmheader = read_BMHD(fp, datasize);
-        else if (!strncmp("CMAP", buffer, 4)) colors = read_CMAP(fp, datasize, &result->num_colors);
-        else if (!strncmp("CRNG", buffer, 4)) read_CRNG(fp, datasize);
-        else if (!strncmp("CAMG", buffer, 4)) bmheader->camgFlags = read_CAMG(fp, datasize);
-        else if (!strncmp("BODY", buffer, 4)) imgdata = read_BODY(fp, datasize, bmheader, &imgdata_size);
+        if (!strncmp("BMHD", (const char *) buffer, 4)) bmheader = read_BMHD(fp, datasize);
+        else if (!strncmp("CMAP", (const char *) buffer, 4)) colors = read_CMAP(fp, datasize, &result->num_colors);
+        else if (!strncmp("CRNG", (const char *) buffer, 4)) read_CRNG(fp, datasize);
+        else if (!strncmp("CAMG", (const char *) buffer, 4)) bmheader->camgFlags = read_CAMG(fp, datasize);
+        else if (!strncmp("BODY", (const char *) buffer, 4)) imgdata = read_BODY(fp, datasize, bmheader, &imgdata_size);
         else {
 #ifdef DEBUG
             printf("WARNING - Unsupported chunk '%s', size: %d\n", id, datasize);
@@ -263,7 +263,7 @@ void ilbm_to_image_data(char *dest, ILBMData *data, int dest_width, int dest_hei
     }
     int src_bytes_per_row = data->bmheader->w / 8;
     int dest_bytes_per_row = dest_width / 8;
-    char *src_ptr = data->imgdata;
+    UBYTE *src_ptr = data->imgdata;
     int src_offset, img_height = data->bmheader->h, num_planes = data->bmheader->nPlanes;
     int row_data_size = num_planes * src_bytes_per_row;
 

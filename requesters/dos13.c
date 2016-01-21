@@ -41,6 +41,7 @@ struct FileListEntry *scan_dir(const char *dirpath, int *num_entries)
         if (current->dvi_Type != DLT_DEVICE) {
             tmp = calloc(1, sizeof(struct FileListEntry));
             tmp->file_type = FILETYPE_VOLUME;
+            tmp->index = n;
             strncpy(tmp->name, ((char *) BADDR(current->dvi_Name)) + 1, MAX_FILENAME_LEN);
             fname_len = strlen(tmp->name);
             // add the colon character to point out that we have a logical volume

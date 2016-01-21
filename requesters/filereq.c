@@ -25,7 +25,6 @@
 
 #define NUM_FILE_ENTRIES 10
 
-// some of these variables don't need to be static
 static int filelist_width;
 static int filelist_height;
 static int filelist_bm_width;
@@ -133,14 +132,14 @@ static struct PropInfo propinfo = {AUTOKNOB | FREEVERT, 0, 0, MAXBODY, MAXBODY,
 #define WIN_TITLE "Open File..."
 
 static struct NewWindow newwin = {
-  0, 0, 0, REQWIN_HEIGHT, 0, 1,
-  IDCMP_GADGETUP | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE,
-  WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE | WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_NOCAREREFRESH,
-  NULL, NULL, WIN_TITLE,
-  NULL, NULL,
-  0, REQWIN_HEIGHT,
-  0, REQWIN_HEIGHT,
-  WBENCHSCREEN
+    0, 0, 0, REQWIN_HEIGHT, 0, 1,
+    IDCMP_GADGETUP | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE,
+    WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE | WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_NOCAREREFRESH,
+    NULL, NULL, WIN_TITLE,
+    NULL, NULL,
+    0, REQWIN_HEIGHT,
+    0, REQWIN_HEIGHT,
+    WBENCHSCREEN
 };
 
 static struct Gadget list_down = {NULL, 0, 0,
@@ -249,6 +248,17 @@ int file_index(int mx, int my) {
     return -1;
 }
 
+int vertpot2entry(int vertpot)
+{
+    int index = vertpot / slider_increment, final_index = index;
+    if (index < 0 || num_current_files < NUM_FILE_ENTRIES) final_index = 0;
+    else if ((num_current_files - index) < NUM_FILE_ENTRIES) {
+        final_index = num_current_files - NUM_FILE_ENTRIES;
+    }
+    printf("computed index: %d, final index: %d\n", index, final_index);
+    return final_index;
+}
+
 static void render_list_backbuffer()
 {
     ClipBlit(&filelist_rastport, 0, 0, requester.ReqLayer->rp,
@@ -263,104 +273,6 @@ static void draw_selection(struct RastPort *src_rp)
     int y1 = FILE_LIST_VMARGIN + select_index * (font_height + FILE_LIST_LINE_DIST) - FILE_LIST_BM_MARGIN;
     int y2 = y1 + font_height;
     RectFill(src_rp, 0, y1, filelist_bm_width, y2);
-}
-
-static void handle_events()
-{
-    BOOL done = FALSE;
-    struct IntuiMessage *msg;
-    ULONG msgClass;
-    UWORD menuCode;
-    int buttonId;
-    ULONG last_seconds, last_micros, seconds, micros;
-    int idx;
-    BOOL movestart = FALSE;
-
-    while (!done) {
-        Wait(1 << req_window->UserPort->mp_SigBit);
-        // since we expect mouse move operations, we need to process all events until
-        // the message queue is empty, otherwise we'll get funny effects by processing
-        // the queued up mouse move events when we actually were notified about a different
-        // event
-        while (msg = (struct IntuiMessage *) GetMsg(req_window->UserPort)) {
-            msgClass = msg->Class;
-            switch (msgClass) {
-            case IDCMP_MOUSEMOVE:
-                if (!movestart) {
-                    CurrentTime(&last_seconds, &last_micros);
-                    movestart = TRUE;
-                } else {
-                    CurrentTime(&seconds, &micros);
-                    ULONG diff = (seconds - last_seconds) * 1000 + (micros - last_micros) / 1000;
-                    if (diff > 300) {
-                        // update the list, but ignore most of the move events,
-                        // otherwise the we need to  process too many events and
-                        // refresh too often
-                        idx = propinfo.VertPot / slider_increment;
-                        printf("gadget up, vslider, vertpot: %d, incr: %d, idx: %d\n",
-                               (int) propinfo.VertPot, slider_increment, idx);
-                        last_seconds = seconds;
-                        last_micros = micros;
-                    }
-                }
-                ReplyMsg((struct Message *) msg);
-                break;
-            case IDCMP_MOUSEBUTTONS:
-                if (msg->Code == SELECTUP) {
-                    // TODO: map to virtual file list indexes
-                    WORD mx = msg->MouseX, my = msg->MouseY, file_i = file_index(mx, my);
-                    if (file_i >= 0 && file_i != select_index) {
-                        draw_selection(&filelist_rastport);
-                        select_index = file_i;
-                        draw_selection(&filelist_rastport);
-                        render_list_backbuffer();
-                    }
-                }
-                ReplyMsg((struct Message *) msg);
-                break;
-            case IDCMP_GADGETUP:
-                buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
-                ReplyMsg((struct Message *) msg);
-                switch (buttonId) {
-                case REQ_OK_BUTTON_ID:
-                    close_requester();
-                    done = TRUE;
-                    break;
-                case REQ_CANCEL_BUTTON_ID:
-                    close_requester();
-                    done = TRUE;
-                    break;
-                case LIST_UP_ID:
-                    // TODO: adjust the vertpot by the increment
-                    // update first_visible_entry and
-                    break;
-                case LIST_DOWN_ID:
-                    break;
-                case VSLIDER_ID:
-                    // determine the portion to be displayed
-                    idx = propinfo.VertPot / slider_increment;
-                    printf("gadget up, vslider, vertpot: %d, incr: %d, idx: %d\n",
-                           (int) propinfo.VertPot, slider_increment, idx);
-                    movestart = FALSE;
-                    break;
-                default:
-                    break;
-                }
-                break;
-            default:
-                break;
-            }
-        }
-    }
-}
-
-static void cleanup()
-{
-    for (int i = 0; i < filelist_bm_depth; i++) {
-        if (filelist_bitmap.Planes[i]) FreeRaster(filelist_bitmap.Planes[i],
-                                                  filelist_width,
-                                                  filelist_height);
-    }
 }
 
 static void clear_list()
@@ -403,6 +315,132 @@ static void draw_list()
 
     // Done drawing, offscreen bitmap is rendered, copy to the requester's layer
     render_list_backbuffer();
+}
+
+static void update_list(int new_first_index)
+{
+    struct FileListEntry *cur = first_visible_entry;
+    int current_index = cur->index;
+    if (new_first_index < current_index) {
+        while (cur->index > new_first_index) cur = cur->prev;
+    } else if (new_first_index > current_index) {
+        while (cur->index < new_first_index) cur = cur->next;
+    }
+    first_visible_entry = cur;
+    clear_list();
+    draw_list();
+}
+
+static void handle_events()
+{
+    BOOL done = FALSE;
+    struct IntuiMessage *msg;
+    ULONG msgClass;
+    UWORD menuCode;
+    int buttonId;
+    ULONG last_seconds, last_micros, seconds, micros;
+    int idx;
+    BOOL movestart = FALSE;
+
+    while (!done) {
+        Wait(1 << req_window->UserPort->mp_SigBit);
+        // since we expect mouse move operations, we need to process all events until
+        // the message queue is empty, otherwise we'll get funny effects by processing
+        // the queued up mouse move events when we actually were notified about a different
+        // event
+        while (msg = (struct IntuiMessage *) GetMsg(req_window->UserPort)) {
+            msgClass = msg->Class;
+            switch (msgClass) {
+            case IDCMP_MOUSEMOVE:
+                if (!movestart) {
+                    CurrentTime(&last_seconds, &last_micros);
+                    movestart = TRUE;
+                } else {
+                    CurrentTime(&seconds, &micros);
+                    ULONG diff = (seconds - last_seconds) * 1000 + (micros - last_micros) / 1000;
+                    if (diff > 300) {
+                        // update the list, but ignore most of the move events,
+                        // otherwise the we need to  process too many events and
+                        // refresh too often
+                        idx = vertpot2entry(propinfo.VertPot);
+                        last_seconds = seconds;
+                        last_micros = micros;
+                        update_list(idx);
+                    }
+                }
+                ReplyMsg((struct Message *) msg);
+                break;
+            case IDCMP_MOUSEBUTTONS:
+                if (msg->Code == SELECTUP) {
+                    // TODO: map to virtual file list indexes
+                    WORD mx = msg->MouseX, my = msg->MouseY, file_i = file_index(mx, my);
+                    if (file_i >= 0 && file_i != select_index) {
+                        draw_selection(&filelist_rastport);
+                        select_index = file_i;
+                        draw_selection(&filelist_rastport);
+                        render_list_backbuffer();
+                    }
+                }
+                ReplyMsg((struct Message *) msg);
+                break;
+            case IDCMP_GADGETUP:
+                buttonId = (int) ((struct Gadget *) (msg->IAddress))->GadgetID;
+                ReplyMsg((struct Message *) msg);
+                switch (buttonId) {
+                case REQ_OK_BUTTON_ID:
+                    close_requester();
+                    done = TRUE;
+                    break;
+                case REQ_CANCEL_BUTTON_ID:
+                    close_requester();
+                    done = TRUE;
+                    break;
+                case LIST_UP_ID:
+                    {
+                        int newpot = propinfo.VertPot - slider_increment;
+                        if (newpot < 0) newpot = 0;
+                        NewModifyProp(&list_vslider, req_window, &requester, AUTOKNOB | FREEVERT,
+                                      0, newpot, MAXBODY, propinfo.VertBody, 1);
+                        int idx = vertpot2entry(newpot);
+                        update_list(idx);
+                    }
+                    break;
+                case LIST_DOWN_ID:
+                    {
+                        int newpot = propinfo.VertPot + slider_increment;
+                        if (newpot > MAXBODY) newpot = MAXBODY;
+                        NewModifyProp(&list_vslider, req_window, &requester, AUTOKNOB | FREEVERT,
+                                      0, newpot, MAXBODY, propinfo.VertBody, 1);
+                        int idx = vertpot2entry(newpot);
+                        update_list(idx);
+                    }
+                    break;
+                case VSLIDER_ID:
+                    // determine the portion to be displayed
+                    idx = vertpot2entry(propinfo.VertPot);
+                    printf("gadget up, vslider, vertpot: %d, incr: %d, idx: %d\n",
+                           (int) propinfo.VertPot, slider_increment, idx);
+                    movestart = FALSE;
+                    update_list(idx);
+                    break;
+                default:
+                    break;
+                }
+                break;
+            default:
+                break;
+            }
+        }
+    }
+}
+
+static void cleanup()
+{
+    for (int i = 0; i < filelist_bm_depth; i++) {
+        if (filelist_bitmap.Planes[i]) FreeRaster(filelist_bitmap.Planes[i],
+                                                  filelist_width,
+                                                  filelist_height);
+    }
 }
 
 /* Initialize the requester window and gadget sizes according to the current font and
@@ -473,7 +511,6 @@ void init_sizes(struct Window *window, struct Requester *requester)
 
 void open_file(struct Window *window)
 {
-    BOOL result;
     InitRequester(&requester);
     init_sizes(window, &requester);
     if (req_window = OpenWindow(&newwin)) {

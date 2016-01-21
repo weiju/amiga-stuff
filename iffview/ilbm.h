@@ -26,10 +26,10 @@
 
 #else
 
-#include <sys/types.h>
-#define ULONG u_int32_t
-#define UWORD u_int16_t
-#define UBYTE u_int8_t
+#include <stdint.h>
+#define ULONG uint32_t
+#define UWORD uint16_t
+#define UBYTE uint8_t
 
 #define LONG int32_t
 #define WORD int16_t

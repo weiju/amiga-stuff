@@ -1,6 +1,6 @@
 #CC=vc +aos68k
 CC=vc +kick13
-CFLAGS=-c99 -I$(NDK_INC) -DDEBUG
+CFLAGS=-c99 -I$(NDK_INC) -DDEBUG -O2
 
 all: main
 

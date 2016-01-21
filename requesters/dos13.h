@@ -20,6 +20,7 @@
 struct FileListEntry {
     struct FileListEntry *next, *prev;
     UWORD file_type;
+    UWORD index; // index in the list
     char name[MAX_FILENAME_LEN + 1];
 };
 
