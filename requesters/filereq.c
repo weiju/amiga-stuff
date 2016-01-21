@@ -25,6 +25,16 @@
 
 #define NUM_FILE_ENTRIES 10
 
+/*
+  this is the wait time between handling mouse drag
+  events of the vslider, 50ms will roughly result in
+  20 updates/redraws per second which is fairly smooth
+*/
+#define VSLIDER_UPDATE_MS 50
+
+// *********************
+//  This is essentially the requester's state, should actually be a struct
+
 static int filelist_width;
 static int filelist_height;
 static int filelist_bm_width;
@@ -39,6 +49,8 @@ static int slider_increment;
  * number of visible entries is fixed, we only need this one.
  */
 static struct FileListEntry *first_visible_entry;
+
+// *********************
 
 enum { LABEL_DRAWER = 0, LABEL_FILE, LABEL_PARENT, LABEL_DRIVES, LABEL_OPEN, LABEL_CANCEL } Labels;
 
@@ -255,7 +267,7 @@ int vertpot2entry(int vertpot)
     else if ((num_current_files - index) < NUM_FILE_ENTRIES) {
         final_index = num_current_files - NUM_FILE_ENTRIES;
     }
-    printf("computed index: %d, final index: %d\n", index, final_index);
+    //printf("computed index: %d, final index: %d\n", index, final_index);
     return final_index;
 }
 
@@ -358,7 +370,7 @@ static void handle_events()
                 } else {
                     CurrentTime(&seconds, &micros);
                     ULONG diff = (seconds - last_seconds) * 1000 + (micros - last_micros) / 1000;
-                    if (diff > 300) {
+                    if (diff > VSLIDER_UPDATE_MS) {
                         // update the list, but ignore most of the move events,
                         // otherwise the we need to  process too many events and
                         // refresh too often
@@ -418,8 +430,8 @@ static void handle_events()
                 case VSLIDER_ID:
                     // determine the portion to be displayed
                     idx = vertpot2entry(propinfo.VertPot);
-                    printf("gadget up, vslider, vertpot: %d, incr: %d, idx: %d\n",
-                           (int) propinfo.VertPot, slider_increment, idx);
+                    //printf("gadget up, vslider, vertpot: %d, incr: %d, idx: %d\n",
+                    //       (int) propinfo.VertPot, slider_increment, idx);
                     movestart = FALSE;
                     update_list(idx);
                     break;
@@ -538,8 +550,14 @@ void open_file(struct Window *window)
                 // the body size by solving the equation
                 // MAXBODY / vertbody = num_current_files / NUM_FILE_ENTRIES
                 vertbody = (MAXBODY * NUM_FILE_ENTRIES) / num_current_files;
-                slider_increment = (MAXBODY / num_current_files);
-                vertpot = select_index * slider_increment;
+
+                // this is surprisingly different that I thought:
+                // we need to compute the increment over the drag space not over
+                // the vslider space, so we can ignore the VertBody setting (in short
+                // VertPot and VertBody are independent)
+                slider_increment = MAXBODY / (num_current_files - NUM_FILE_ENTRIES);
+                vertpot = first_visible_entry->index * slider_increment;
+                printf("vpot: %d, vbody: %d inc: %d\n", vertpot, vertbody, slider_increment);
             }
             NewModifyProp(&list_vslider, req_window, &requester, AUTOKNOB | FREEVERT,
                           0, vertpot, MAXBODY, vertbody, 1);
