@@ -246,7 +246,8 @@ static void close_requester()
     }
 }
 
-int file_index(int mx, int my) {
+// for a window coordinate, return the visual index in the file list
+int file_list_index(int mx, int my) {
     int x1 = REQ_HMARGIN;
     int y1 = REQ_VMARGIN + FILE_LIST_VMARGIN + FILE_LIST_BM_MARGIN;
     int x2 = x1 + filelist_width;
@@ -254,10 +255,23 @@ int file_index(int mx, int my) {
     if (mx >= x1 && mx <= x2 && my >= y1 && my <= y2) {
         int rely = my - y1;
         int index = rely / (font_height + FILE_LIST_LINE_DIST);
-        //printf("rely: %d, new sel index: %d\n", rely, index);
+        // printf("rely: %d, new sel index: %d\n", rely, index);
         return index < NUM_FILE_ENTRIES ? index : -1;
     }
     return -1;
+}
+
+// map file list index to index in the file list
+struct FileListEntry *entry_at_list_index(int index)
+{
+    if (index < 0) return NULL;
+    struct FileListEntry *cur = first_visible_entry;
+    int count = 0;
+    while (cur && count < index) {
+        cur = cur->next;
+        count++;
+    }
+    return cur;
 }
 
 int vertpot2entry(int vertpot)
@@ -278,11 +292,11 @@ static void render_list_backbuffer()
              0xc0);
 }
 
-static void draw_selection(struct RastPort *src_rp)
+static void draw_selection(struct RastPort *src_rp, int view_index)
 {
     // Draw selection rectangle
     SetDrMd(src_rp, COMPLEMENT);
-    int y1 = FILE_LIST_VMARGIN + select_index * (font_height + FILE_LIST_LINE_DIST) - FILE_LIST_BM_MARGIN;
+    int y1 = FILE_LIST_VMARGIN + view_index * (font_height + FILE_LIST_LINE_DIST) - FILE_LIST_BM_MARGIN;
     int y2 = y1 + font_height;
     RectFill(src_rp, 0, y1, filelist_bm_width, y2);
 }
@@ -292,6 +306,15 @@ static void clear_list()
     for (int i = 0; i < filelist_bm_depth; i++) {
         BltClear(filelist_bitmap.Planes[i],
                  RASSIZE(filelist_width, filelist_height), 1);
+    }
+}
+
+static void clear_selections()
+{
+    struct FileListEntry *cur = current_files;
+    while (cur) {
+        cur->selected = 0;
+        cur = cur->next;
     }
 }
 
@@ -318,12 +341,12 @@ static void draw_list()
     while (cur && count < NUM_FILE_ENTRIES) {
         Move(src_rp, 8, ypos);
         Text(src_rp, cur->name, strlen(cur->name));
-        cur = cur->next;
         ypos += font_height + FILE_LIST_LINE_DIST;
+        if (cur->selected) draw_selection(src_rp, count);
+        cur = cur->next;
         count++;
     }
 
-    draw_selection(src_rp);
 
     // Done drawing, offscreen bitmap is rendered, copy to the requester's layer
     render_list_backbuffer();
@@ -384,13 +407,14 @@ static void handle_events()
                 break;
             case IDCMP_MOUSEBUTTONS:
                 if (msg->Code == SELECTUP) {
-                    // TODO: map to virtual file list indexes
-                    WORD mx = msg->MouseX, my = msg->MouseY, file_i = file_index(mx, my);
-                    if (file_i >= 0 && file_i != select_index) {
-                        draw_selection(&filelist_rastport);
-                        select_index = file_i;
-                        draw_selection(&filelist_rastport);
-                        render_list_backbuffer();
+                    // map to virtual file list indexes, only select if not already selected
+                    struct FileListEntry *entry = entry_at_list_index(file_list_index(msg->MouseX, msg->MouseY));
+                    if (entry != NULL && !entry->selected) {
+                        clear_selections();
+                        //printf("select '%s', index: %d\n", entry->name, (int) entry->index);
+                        entry->selected = 1;
+                        clear_list();
+                        draw_list();
                     }
                 }
                 ReplyMsg((struct Message *) msg);
