@@ -132,8 +132,12 @@ static struct Border cancel_button_border = {0, 0, 1, 0, JAM1, 5, cancel_border_
 static struct Border str_gadget_border = {0, 0, 1, 0, JAM1, 5, string_border_points, NULL};
 static struct Border file_list_border = {0, 0, 1, 0, JAM1, 5, list_border_points, NULL};
 
-static UBYTE buffer1[82], undobuffer1[82];
-static struct StringInfo strinfo1 = {buffer1, undobuffer1, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
+#define DIRSTRING_SIZE 80
+#define DIRBUFFER_SIZE (DIRSTRING_SIZE + 2)
+static UBYTE buffer1[DIRBUFFER_SIZE], undobuffer1[DIRBUFFER_SIZE];
+
+static struct StringInfo strinfo1 = {buffer1, undobuffer1, 0, DIRSTRING_SIZE, 0, 0, 0, 0, 0, 0,
+                                     NULL, 0, NULL};
 static UBYTE buffer2[82], undobuffer2[82];
 static struct StringInfo strinfo2 = {buffer2, undobuffer2, 0, 80, 0, 0, 0, 0, 0, 0, NULL, 0, NULL};
 
@@ -366,6 +370,15 @@ static void update_list(int new_first_index)
     draw_list();
 }
 
+static void update_string_gadgets(struct FileListEntry *entry)
+{
+    // set the name to the gadget and refresh
+    RemoveGList(req_window, &dir_text, 1);
+    strncpy(buffer1, entry->name, DIRBUFFER_SIZE);
+    AddGList(req_window, &dir_text, 0, 1, &requester);
+    RefreshGList(&dir_text, req_window, &requester, 1);
+}
+
 static void handle_events()
 {
     BOOL done = FALSE;
@@ -373,9 +386,9 @@ static void handle_events()
     ULONG msgClass;
     UWORD menuCode;
     int buttonId;
-    ULONG last_seconds, last_micros, seconds, micros;
+    ULONG last_scroll_seconds = 0, last_scroll_micros = 0, scroll_seconds, scroll_micros;
+    ULONG start_click_secs = 0, start_click_micros = 0, click_secs, click_micros;
     int idx;
-    BOOL movestart = FALSE;
 
     while (!done) {
         Wait(1 << req_window->UserPort->mp_SigBit);
@@ -387,19 +400,19 @@ static void handle_events()
             msgClass = msg->Class;
             switch (msgClass) {
             case IDCMP_MOUSEMOVE:
-                if (!movestart) {
-                    CurrentTime(&last_seconds, &last_micros);
-                    movestart = TRUE;
+                if (last_scroll_seconds == 0) {
+                    CurrentTime(&last_scroll_seconds, &last_scroll_micros);
                 } else {
-                    CurrentTime(&seconds, &micros);
-                    ULONG diff = (seconds - last_seconds) * 1000 + (micros - last_micros) / 1000;
+                    CurrentTime(&scroll_seconds, &scroll_micros);
+                    ULONG diff = (scroll_seconds - last_scroll_seconds) * 1000 +
+                        (scroll_micros - last_scroll_micros) / 1000;
                     if (diff > VSLIDER_UPDATE_MS) {
                         // update the list, but ignore most of the move events,
                         // otherwise the we need to  process too many events and
                         // refresh too often
                         idx = vertpot2entry(propinfo.VertPot);
-                        last_seconds = seconds;
-                        last_micros = micros;
+                        last_scroll_seconds = scroll_seconds;
+                        last_scroll_micros = scroll_micros;
                         update_list(idx);
                     }
                 }
@@ -407,14 +420,28 @@ static void handle_events()
                 break;
             case IDCMP_MOUSEBUTTONS:
                 if (msg->Code == SELECTUP) {
+                    BOOL is_doubleclick = FALSE;
                     // map to virtual file list indexes, only select if not already selected
-                    struct FileListEntry *entry = entry_at_list_index(file_list_index(msg->MouseX, msg->MouseY));
+                    CurrentTime(&click_secs, &click_micros);
+                    if (start_click_secs == 0) {
+                        start_click_secs = click_secs;
+                        start_click_micros = click_micros;
+                    } else {
+                        is_doubleclick = DoubleClick(start_click_secs, start_click_micros,
+                                                     click_secs, click_micros);
+                        start_click_secs = start_click_micros = 0;
+                    }
+                    struct FileListEntry *entry = entry_at_list_index(file_list_index(msg->MouseX,
+                                                                                      msg->MouseY));
                     if (entry != NULL && !entry->selected) {
                         clear_selections();
                         //printf("select '%s', index: %d\n", entry->name, (int) entry->index);
                         entry->selected = 1;
                         clear_list();
                         draw_list();
+                        update_string_gadgets(entry);
+                    } else if (entry != NULL && is_doubleclick) {
+                        printf("double click on: %s\n", entry->name);
                     }
                 }
                 ReplyMsg((struct Message *) msg);
@@ -456,7 +483,7 @@ static void handle_events()
                     idx = vertpot2entry(propinfo.VertPot);
                     //printf("gadget up, vslider, vertpot: %d, incr: %d, idx: %d\n",
                     //       (int) propinfo.VertPot, slider_increment, idx);
-                    movestart = FALSE;
+                    last_scroll_seconds = last_scroll_micros = 0;
                     update_list(idx);
                     break;
                 default:
