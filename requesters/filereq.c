@@ -41,7 +41,6 @@ static int filelist_bm_width;
 static int filelist_bm_height;
 static struct FileListEntry *current_files;
 static int num_current_files;
-static int select_index = 1;
 static int slider_increment;
 
 /*
@@ -225,22 +224,7 @@ static int filelist_bm_depth = 1;
 static struct BitMap filelist_bitmap;
 static struct RastPort filelist_rastport;
 
-#define PATHBUFFER_SIZE 200
-static char dirname[PATHBUFFER_SIZE + 1];
-static BPTR flock;
-static LONG error;
-static struct FileInfoBlock fileinfo;
-
 static UWORD font_baseline, font_height;
-
-static void print_fileinfo(struct FileInfoBlock *fileinfo)
-{
-    if (fileinfo->fib_DirEntryType > 0) {
-        printf("dir: '%s'\n", fileinfo->fib_FileName);
-    } else {
-        printf("file: '%s'\n", fileinfo->fib_FileName);
-    }
-}
 
 static void close_requester()
 {
@@ -350,8 +334,6 @@ static void draw_list()
         cur = cur->next;
         count++;
     }
-
-
     // Done drawing, offscreen bitmap is rendered, copy to the requester's layer
     render_list_backbuffer();
 }
@@ -377,6 +359,38 @@ static void update_string_gadgets(struct FileListEntry *entry)
     strncpy(buffer1, entry->name, DIRBUFFER_SIZE);
     AddGList(req_window, &dir_text, 0, 1, &requester);
     RefreshGList(&dir_text, req_window, &requester, 1);
+}
+
+static void reload_file_list(const char *dirpath)
+{
+    int num_files;
+    struct FileListEntry *dir_entries = scan_dir(dirpath, &num_files);
+    if (current_files) free_file_list(current_files);
+    current_files = dir_entries;
+    num_current_files = num_files;
+    first_visible_entry = current_files;
+    clear_list();
+    draw_list();
+
+    // set the length of the slider thumb according to the current file list
+    int vertbody = MAXBODY;
+    int vertpot = MAXBODY;
+    if (num_current_files > NUM_FILE_ENTRIES) {
+        // because we can only use integer division, so we have to determine
+        // the body size by solving the equation
+        // MAXBODY / vertbody = num_current_files / NUM_FILE_ENTRIES
+        vertbody = (MAXBODY * NUM_FILE_ENTRIES) / num_current_files;
+
+        // this is surprisingly different that I thought:
+        // we need to compute the increment over the drag space not over
+        // the vslider space, so we can ignore the VertBody setting (in short
+        // VertPot and VertBody are independent)
+        slider_increment = MAXBODY / (num_current_files - NUM_FILE_ENTRIES);
+        vertpot = first_visible_entry->index * slider_increment;
+        printf("vpot: %d, vbody: %d inc: %d\n", vertpot, vertbody, slider_increment);
+    }
+    NewModifyProp(&list_vslider, req_window, &requester, AUTOKNOB | FREEVERT,
+                  0, vertpot, MAXBODY, vertbody, 1);
 }
 
 static void handle_events()
@@ -442,6 +456,9 @@ static void handle_events()
                         update_string_gadgets(entry);
                     } else if (entry != NULL && is_doubleclick) {
                         printf("double click on: %s\n", entry->name);
+                        if (entry->file_type == FILETYPE_VOLUME || entry->file_type == FILETYPE_DIR) {
+                            reload_file_list(entry->name);
+                        }
                     }
                 }
                 ReplyMsg((struct Message *) msg);
@@ -591,30 +608,10 @@ void open_file(struct Window *window)
         filelist_rastport.BitMap = &filelist_bitmap;
 
         if (req_opened = Request(&requester, req_window)) {
-            current_files = scan_dir(NULL, &num_current_files);
-            first_visible_entry = current_files;
-            // set the length of the slider thumb according to the current file list
-            int vertbody = MAXBODY;
-            int vertpot = MAXBODY;
-            if (num_current_files > NUM_FILE_ENTRIES) {
-                // because we can only use integer division, so we have to determine
-                // the body size by solving the equation
-                // MAXBODY / vertbody = num_current_files / NUM_FILE_ENTRIES
-                vertbody = (MAXBODY * NUM_FILE_ENTRIES) / num_current_files;
-
-                // this is surprisingly different that I thought:
-                // we need to compute the increment over the drag space not over
-                // the vslider space, so we can ignore the VertBody setting (in short
-                // VertPot and VertBody are independent)
-                slider_increment = MAXBODY / (num_current_files - NUM_FILE_ENTRIES);
-                vertpot = first_visible_entry->index * slider_increment;
-                printf("vpot: %d, vbody: %d inc: %d\n", vertpot, vertbody, slider_increment);
-            }
-            NewModifyProp(&list_vslider, req_window, &requester, AUTOKNOB | FREEVERT,
-                          0, vertpot, MAXBODY, vertbody, 1);
-            draw_list();
+            reload_file_list(NULL);
             handle_events();
             free_file_list(current_files);
+            current_files = first_visible_entry = NULL;
             CloseWindow(req_window);
             req_window = NULL;
         } else {

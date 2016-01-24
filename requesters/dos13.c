@@ -11,6 +11,7 @@
 
 extern struct Library *DOSBase;
 
+
 /*
   accessing the list of logical volumes is hairy under AmigaOS 1.x - it is
   "hidden" in the DosBase structure, and shared among all tasks.
@@ -26,7 +27,7 @@ extern struct Library *DOSBase;
   For now, we will omit device typed entries, because writing/reading to them
   usually doesn't make too much sense.
 */
-struct FileListEntry *scan_dir(const char *dirpath, int *num_entries)
+static struct FileListEntry *all_volumes(int *num_entries)
 {
     struct DosLibrary *dosbase = (struct DosLibrary *) DOSBase;
     Forbid();
@@ -57,35 +58,58 @@ struct FileListEntry *scan_dir(const char *dirpath, int *num_entries)
         current = BADDR(current->dvi_Next);
     }
     Permit();
-    /* scan current directory */
-    /*
-      on AmigaOS versions before 36 (essentially all 1.x versions), the
-      function GetCurrentDirName() does not exist, but it's obtainable
-      by calling Cli() and querying the returned CommandLineInterface
-      structure
-    */
-    /*
-    puts("scanning directory...");
-    // on AmigaOS 1.x, this function does not exist !!!
-    GetCurrentDirName(dirname, PATHBUFFER_SIZE);
-    printf("current dir: '%s'\n", dirname);
-    flock = Lock(dirname, SHARED_LOCK);
+    *num_entries = n;
+    /* The result is an unsorted list, which is usually not what we want.
+       TODO: sort the list
+     */
+    return result;
+}
+
+static struct FileListEntry *dir_contents(const char *dirpath, int *num_entries)
+{
+    struct FileInfoBlock fileinfo;
+    struct FileListEntry *cur_entry = NULL, *result = NULL, *tmp;
+    int n = 0;
+
+    BPTR flock = Lock(dirpath, SHARED_LOCK);
     if (Examine(flock, &fileinfo)) {
         while (ExNext(flock, &fileinfo)) {
-            print_fileinfo(&fileinfo);
+            tmp = calloc(1, sizeof(struct FileListEntry));
+            if (fileinfo.fib_DirEntryType < 0) tmp->file_type = FILETYPE_FILE;
+            else if (fileinfo.fib_DirEntryType > 0) tmp->file_type = FILETYPE_DIR;
+            else tmp->file_type = FILETYPE_VOLUME;
+            tmp->index = n;
+            strncpy(tmp->name, fileinfo.fib_FileName, MAX_FILENAME_LEN);
+
+            if (!cur_entry) result = cur_entry = tmp;
+            else {
+                cur_entry->next = tmp;
+                tmp->prev = cur_entry;
+                cur_entry = tmp;
+            }
+            n++;
         }
-        error = IoErr();
+        LONG error = IoErr();
         if (error != ERROR_NO_MORE_ENTRIES) {
             puts("unknown I/O error, TODO handle");
         }
     }
     UnLock(flock);
-    */
-    /* The result is an unsorted list, which is usually not what we want.
-       TODO: sort the list
-     */
     *num_entries = n;
     return result;
+}
+
+/*
+  scan current directory
+  on AmigaOS versions before 36 (essentially all 1.x versions), the
+  function GetCurrentDirName() does not exist, but it's obtainable
+  by calling Cli() and querying the returned CommandLineInterface
+  structure
+*/
+struct FileListEntry *scan_dir(const char *dirpath, int *num_entries)
+{
+    if (!dirpath) return all_volumes(num_entries);
+    return dir_contents(dirpath, num_entries);
 }
 
 void free_file_list(struct FileListEntry *entries)
