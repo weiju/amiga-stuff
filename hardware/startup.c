@@ -30,26 +30,33 @@ void waitmouse() = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
 #define VFREQ_PAL 50
 #define WB_SCREEN_NAME "Workbench"
 
+#define BPLCON0       0x100
+#define COLOR00       0x180
+
+#define BPLCON0_COLOR (1 << 9)
+
+#define COP_MOVE(addr, data) addr, data
+#define COP_WAIT_END  0xffff, 0xfffe
+
 static UWORD __chip coplist_pal[] = {
-    0x100, 0x200,        // otherwise no display!
-    0x180, 0x00,
-    0x8107, 0xfffe,      // wait for $8107,$fffe
-    0x180,
-    0xf0f,               // background red
-    0xd607, 0xfffe,      // wait for $d607,$fffe
-    0x180, 0xff0,        // background yellow
-    0xffff, 0xfffe,
-    0xffff, 0xfffe
+    COP_MOVE(BPLCON0, BPLCON0_COLOR),
+    COP_MOVE(COLOR00, 0x000),
+    0x8107, 0xfffe,            // wait for $8107,$fffe
+    COP_MOVE(COLOR00, 0xf00),
+    0xd607, 0xfffe,            // wait for $d607,$fffe
+    COP_MOVE(COLOR00, 0xff0),
+    COP_WAIT_END,
+    COP_WAIT_END
 };
 static UWORD __chip coplist_ntsc[] = {
-    0x100, 0x0200,      // otherwise no display!
-    0x180, 0x00,
-    0x6e07, 0xfffe,     // wait for $6e07,$fffe
-    0x180, 0xf00,       // background red
-    0xb007, 0xfffe,     // wait for $b007,$fffe
-    0x180, 0xff0,       // background yellow
-    0xffff, 0xfffe,
-    0xffff, 0xfffe
+    COP_MOVE(BPLCON0, BPLCON0_COLOR),
+    COP_MOVE(COLOR00, 0x000),
+    0x6e07, 0xfffe,           // wait for $6e07,$fffe
+    COP_MOVE(COLOR00, 0xf00),
+    0xb007, 0xfffe,           // wait for $b007,$fffe
+    COP_MOVE(COLOR00, 0xff0),
+    COP_WAIT_END,
+    COP_WAIT_END
 };
 
 static struct Screen *wbscreen;

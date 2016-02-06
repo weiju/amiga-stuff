@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# jpg2ham6 - a tool to convert jpg images to HAM6 IFF/ILBM
+# requires Netpbm
+
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <jpg-file> <iff-file>"
+else
+  jpegtopnm $1 | ppmtoilbm -ham6 -ecs > $2
+fi

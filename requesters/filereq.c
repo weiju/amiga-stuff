@@ -1,10 +1,12 @@
 #include <string.h>
 #include <intuition/intuition.h>
+#include <graphics/clip.h>
 #include <dos/dosextens.h>
 
 #include <clib/exec_protos.h>
 #include <clib/intuition_protos.h>
 #include <clib/graphics_protos.h>
+#include <clib/layers_protos.h>
 #include <clib/dos_protos.h>
 #include <clib/alib_stdio_protos.h>
 
@@ -87,6 +89,9 @@ enum {
     LIST_UP_ID, LIST_DOWN_ID
 } GadgetIDs;
 
+// This requester's purpose is simply to block the parent window's input
+static struct Requester block_requester;
+
 static struct Requester requester;
 static BOOL req_opened = FALSE;
 static struct Window *req_window;
@@ -149,7 +154,7 @@ static struct PropInfo propinfo = {AUTOKNOB | FREEVERT, 0, 0, MAXBODY, MAXBODY,
 static struct NewWindow newwin = {
     0, 0, 0, REQWIN_HEIGHT, 0, 1,
     IDCMP_GADGETUP | IDCMP_MOUSEBUTTONS | IDCMP_MOUSEMOVE,
-    WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE | WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_NOCAREREFRESH,
+    WFLG_CLOSEGADGET | WFLG_ACTIVATE | WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_SIMPLE_REFRESH | WFLG_NOCAREREFRESH,
     NULL, NULL, WIN_TITLE,
     NULL, NULL,
     0, REQWIN_HEIGHT,
@@ -275,9 +280,11 @@ int vertpot2entry(int vertpot)
 
 static void render_list_backbuffer()
 {
+    LockLayer(0L, requester.ReqLayer);
     ClipBlit(&filelist_rastport, 0, 0, requester.ReqLayer->rp,
              FILE_LIST_BM_MARGIN, FILE_LIST_BM_MARGIN, filelist_bm_width, filelist_bm_height,
              0xc0);
+    UnlockLayer(requester.ReqLayer);
 }
 
 static void draw_selection(struct RastPort *src_rp, int view_index)
@@ -317,7 +324,6 @@ static void draw_list()
     // layer's rastport, because it is rendered on top of the
     // parent window and obscures the content
     struct RastPort *src_rp = &filelist_rastport;
-    struct RastPort *dst_rp = requester.ReqLayer->rp;
 
     // make sure drawing is clipped, otherwise it will
     // draw somewhere else into memory
@@ -589,7 +595,7 @@ void init_sizes(struct Window *window, struct Requester *requester)
     requester->ReqText = NULL;
 }
 
-void open_file(struct Window *window)
+static void open_request_window(struct Window *window)
 {
     InitRequester(&requester);
     init_sizes(window, &requester);
@@ -620,5 +626,24 @@ void open_file(struct Window *window)
         cleanup();
     } else {
         puts("OpenWindow() failed !!!");
+    }
+}
+
+void open_file(struct Window *window)
+{
+    InitRequester(&block_requester);
+    // note that the Request() call fails, when everything is set to 0,
+    // contrary to the docs.
+    block_requester.Width = 1;
+    block_requester.Height = 1;
+    block_requester.LeftEdge = REQ_HMARGIN;
+    block_requester.TopEdge = REQ_VMARGIN;
+
+    if (Request(&block_requester, window)) {
+        printf("top request opened\n");
+        open_request_window(window);
+        EndRequest(&block_requester, window);
+    } else {
+        printf("top request failed\n");
     }
 }
