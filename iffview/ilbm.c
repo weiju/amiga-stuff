@@ -114,17 +114,33 @@ UBYTE *read_BODY(FILE *fp, int datasize, BitMapHeader *bmheader, int *data_bytes
   if (bmheader->compression == cmpByteRun1) {
     BYTE b0, b1;
     int i;
+
     /* decompress data */
     dst_buffer = malloc(dst_size);
     *data_bytes = dst_size;
+    // we have to check overrun in dst_buffer, too. This actually can happen !!
     while (src_i < datasize) {
-      b0 = buffer[src_i++];
-      if (b0 >= 0) {
-        for (i = 0; i < b0 + 1; i++) dst_buffer[dst_i++] = buffer[src_i++];
-      } else {
-        b1 = buffer[src_i++];
-        for (i = 0; i < -b0 + 1; i++) dst_buffer[dst_i++] = b1;
-      }
+        if (dst_i >= dst_size) break;
+        b0 = buffer[src_i++];
+        if (b0 >= 0) {
+            for (i = 0; i < b0 + 1; i++) {
+                if (dst_i >= dst_size) {
+                    puts("WARNING: buffer overrun (decompress: in direct copy)");
+                    break;
+                }
+                dst_buffer[dst_i++] = buffer[src_i++];
+            }
+        } else if (b0 != -128) {
+            b1 = buffer[src_i++];
+            for (i = 0; i < -b0 + 1; i++) {
+                if (dst_i >= dst_size) {
+                    printf("WARNING: buffer overrun (in decompress), b0=%d\n", (int) b0);
+                    break;
+                }
+                dst_buffer[dst_i++] = b1;
+            }
+        }
+        // -128 is a NOP
     }
     free(buffer);
     return dst_buffer;
