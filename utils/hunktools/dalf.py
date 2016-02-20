@@ -47,7 +47,7 @@ def read_string_list(infile):
     while strlen > 0:
         result.append(str(infile.read(strlen)))
         strlen = read_int32(infile)
-        
+
     return []
 
 
@@ -112,9 +112,10 @@ def read_block(infile, is_loadfile):
         return ('NAME', str(infile.read(read_int32(infile) * 4)))
     else:
         raise Exception("unsupported id: %s" % id)
-        
+
     return None
-    
+
+
 def read_blocks(infile, is_loadfile):
     result = []
     block = read_block(infile, is_loadfile)
@@ -140,7 +141,28 @@ def group_blocks(blocks):
             current_group.append(block)
     return groups
 
-def print_hunks(hunks):
+
+def print_data(data, items_per_line=16):
+    """Do a hex dump on the specified data"""
+    offset = 0
+    length = len(data)
+    while offset < length:
+        i = 0
+        old_offset = offset
+        items = []
+        while offset < length and i < items_per_line:
+            items.append(data[offset])
+            offset += 1
+            i += 1
+        ascii_rep = "".join(map(lambda n: chr(n) if n >= 32 and n < 128 else '.', items))
+
+        # if there are to few items, fill the gap to ensure clean output
+        line = " ".join(map(lambda n: "%02x" % n, items))
+        line += " " + " ".join(["**"] * (items_per_line - len(items)))
+        print("$%06x: %s    %s" % (old_offset, line, ascii_rep))
+
+
+def print_hunks(hunks, disassembled):
     for i, hunk in enumerate(hunks):
         block = hunk[0]
         if block[0] == 'NAME':
@@ -150,9 +172,16 @@ def print_hunks(hunks):
         elif block[0] == 'CODE':
             print("%d: '%s', size = %d" % (i, block[0], len(block[1])))
             code = block[1]
-            disassemble(code)
+            if disassembled:
+                disassemble(code)
+            else:
+                print_data(code)
+        elif block[0] == 'DATA':
+            print("%d: '%s', size = %d" % (i, block[0], len(block[1])))
+            print_data(block[1])
         else:
             print("%d: '%s'" % (i, block[0]))
+        print("")
 
 
 def dump_code_hunks(hunkfile, hunks):
@@ -170,7 +199,8 @@ def print_overview(hunks):
             print("    %s" % block[0])
         print("    END")
 
-def parse_hunkfile(hunkfile, disassemble, dump_code):
+
+def parse_hunkfile(hunkfile, disassembled, dump_code, detail):
     """Top level parsing function"""
     with open(hunkfile, 'rb') as infile:
         id = infile.read(4)
@@ -202,12 +232,12 @@ def parse_hunkfile(hunkfile, disassemble, dump_code):
         else:
             is_loadfile = False
             raise Exception('Unsupported header type')
-        
+
         blocks = read_blocks(infile, is_loadfile)
         hunks = group_blocks(blocks)
 
-        if disassemble:
-            print_hunks(hunks)
+        if disassembled or detail:
+            print_hunks(hunks, disassembled)
         else:
             print_overview(hunks)
 
@@ -220,8 +250,11 @@ if __name__ == '__main__':
     parser.add_argument('hunkfile', help="hunk format file")
     parser.add_argument('--disassemble', action="store_true", default=False,
                         help="show disassembly")
+    parser.add_argument('--detail', action="store_true", default=False,
+                        help="show data")
     parser.add_argument('--dump_code', action="store_true", default=False,
-                        help="dump each code hunk to a separate file")
+                        help="extracts and dumps each code hunk to a separate file")
 
     args = parser.parse_args()
-    parse_hunkfile(args.hunkfile, disassemble=args.disassemble, dump_code=args.dump_code)
+    parse_hunkfile(args.hunkfile, disassembled=args.disassemble, dump_code=args.dump_code,
+                   detail=args.detail)
