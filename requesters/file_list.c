@@ -1,5 +1,6 @@
 #include "file_list.h"
 #include <stdlib.h>
+#include <string.h>
 
 void free_file_list(struct FileListEntry *entries)
 {
@@ -44,15 +45,26 @@ static struct FileListEntry *merge(struct FileListEntry *list1, struct FileListE
     }
 }
 
-struct FileListEntry *sort_file_list(struct FileListEntry *list, BOOL asc)
+static struct FileListEntry *_sort_file_list(struct FileListEntry *list, BOOL asc)
 {
     if (!list || !list->next) return list;
     struct FileListEntry *list2 = splice(list);
-    list = sort_file_list(list, asc);
-    list2 = sort_file_list(list2, asc);
+    list = _sort_file_list(list, asc);
+    list2 = _sort_file_list(list2, asc);
     return merge(list, list2, asc);
 }
 
+struct FileListEntry *sort_file_list(struct FileListEntry *list, BOOL asc)
+{
+    struct FileListEntry *result = _sort_file_list(list, asc), *cur = result;
+    int index = 0;
+    // fix the index after sorting
+    while (cur) {
+        cur->index = index++;
+        cur = cur->next;
+    }
+    return result;
+}
 struct FileListEntry *new_file_list_entry()
 {
     return calloc(1, sizeof(struct FileListEntry));

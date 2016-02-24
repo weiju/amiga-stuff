@@ -23,6 +23,7 @@ CHIBI_TEST(TestSortListSingle)
     struct FileListEntry *entry = new_file_list_entry();
     chibi_assert(sort_file_list(entry, TRUE) == entry);
     chibi_assert(sort_file_list(entry, FALSE) == entry);
+    chibi_assert_eq_int(entry->index, 0);
     free_file_list(entry);
 }
 
@@ -36,6 +37,10 @@ CHIBI_TEST(TestSortListTwoElemsAsc)
     entry2->prev = entry1;
 
     chibi_assert(sort_file_list(entry1, TRUE) == entry2);
+    chibi_assert(entry2->prev == NULL);
+    chibi_assert(entry1->next == NULL);
+    chibi_assert_eq_int(0, entry2->index);
+    chibi_assert_eq_int(1, entry1->index);
     free_file_list(entry2);
 }
 
@@ -49,6 +54,10 @@ CHIBI_TEST(TestSortListTwoElemsDesc)
     entry2->prev = entry1;
 
     chibi_assert(sort_file_list(entry1, FALSE) == entry1);
+    chibi_assert(entry1->prev == NULL);
+    chibi_assert(entry2->next == NULL);
+    chibi_assert_eq_int(0, entry1->index);
+    chibi_assert_eq_int(1, entry2->index);
     free_file_list(entry1);
 }
 

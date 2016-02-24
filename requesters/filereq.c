@@ -371,6 +371,7 @@ static void reload_file_list(const char *dirpath)
 {
     int num_files;
     struct FileListEntry *dir_entries = scan_dir(dirpath, &num_files);
+    dir_entries = sort_file_list(dir_entries, TRUE);
     if (current_files) free_file_list(current_files);
     current_files = dir_entries;
     num_current_files = num_files;

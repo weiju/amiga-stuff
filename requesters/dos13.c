@@ -59,9 +59,6 @@ static struct FileListEntry *all_volumes(int *num_entries)
     }
     Permit();
     *num_entries = n;
-    /* The result is an unsorted list, which is usually not what we want.
-       TODO: sort the list
-     */
     return result;
 }
 
