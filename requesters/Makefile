@@ -7,5 +7,12 @@ all: main
 clean:
 	rm -f *.o main
 
-main: main.o filereq.o dos13.o
+main: main.o filereq.o dos13.o file_list.o
 	$(CC) $(CFLAGS) $^ -lamiga -lauto -o $@
+
+
+check: file_list_test
+
+file_list_test: file_list.c file_list_test.c chibi.c
+	gcc $^ -o $@
+	./file_list_test

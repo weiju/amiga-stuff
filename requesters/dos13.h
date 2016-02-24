@@ -3,27 +3,7 @@
 #ifndef __DOS13_H__
 #define __DOS13_H__
 
-#include <exec/types.h>
-
-#define FILETYPE_FILE   0
-#define FILETYPE_DIR    1
-#define FILETYPE_VOLUME 2
-
-// This file requester is only for 1.x, so 31 characters is the
-// maximum
-#define MAX_FILENAME_LEN 31
-
-/*
- * Store file list entries in these entries. Storing a previous pointer allows us to
- * navigate backwards, e.g. for scrolling up a file list.
- */
-struct FileListEntry {
-    struct FileListEntry *next, *prev;
-    UWORD file_type;
-    UWORD index; // index in the list
-    UWORD selected;
-    char name[MAX_FILENAME_LEN + 1];
-};
+#include "file_list.h"
 
 /*
  * Scans the specified directory and returns the entries, if dirpath is NULL,

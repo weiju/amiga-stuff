@@ -111,13 +111,3 @@ struct FileListEntry *scan_dir(const char *dirpath, int *num_entries)
     if (!dirpath) return all_volumes(num_entries);
     return dir_contents(dirpath, num_entries);
 }
-
-void free_file_list(struct FileListEntry *entries)
-{
-    struct FileListEntry *cur = entries, *next;
-    while (cur) {
-        next = cur->next;
-        free(cur);
-        cur = next;
-    }
-}
