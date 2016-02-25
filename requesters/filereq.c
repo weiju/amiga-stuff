@@ -361,9 +361,9 @@ static void update_list(int new_first_index)
 static void update_string_gadgets(struct FileListEntry *entry)
 {
     // set the name to the gadget and refresh
-    RemoveGList(req_window, &dir_text, 1);
+    UWORD oldpos = RemoveGList(req_window, &dir_text, 1);
     strncpy(buffer1, entry->name, DIRBUFFER_SIZE);
-    AddGList(req_window, &dir_text, 0, 1, &requester);
+    AddGList(req_window, &dir_text, oldpos, 1, &requester);
     RefreshGList(&dir_text, req_window, &requester, 1);
 }
 
@@ -398,6 +398,20 @@ static void reload_file_list(const char *dirpath)
     }
     NewModifyProp(&list_vslider, req_window, &requester, AUTOKNOB | FREEVERT,
                   0, vertpot, MAXBODY, vertbody, 1);
+
+    // Depending on which directory we are in, the Parent gadget can be either
+    // enabled or disabled.
+    // Unfortunately, the OnGadget()/OffGadget() does not render the gadget
+    // correctly (only the label is), so we need to do it the hard way.
+    UWORD oldpos = RemoveGList(req_window, &parent_button, 1);
+    SetAPen(requester.ReqLayer->rp, 0);
+    RectFill(requester.ReqLayer->rp, parent_button.LeftEdge, parent_button.TopEdge,
+             parent_button.LeftEdge + parent_button.Width,
+             parent_button.TopEdge + parent_button.Height);
+    if (dirpath) parent_button.Flags &= ~GFLG_DISABLED;
+    else parent_button.Flags |= GFLG_DISABLED;
+    AddGList(req_window, &parent_button, oldpos, 1, &requester);
+    RefreshGList(&parent_button, req_window, &requester, 1);
 }
 
 static void handle_events()
@@ -481,6 +495,12 @@ static void handle_events()
                 case REQ_CANCEL_BUTTON_ID:
                     close_requester();
                     done = TRUE;
+                    break;
+                case REQ_DRIVES_BUTTON_ID:
+                    reload_file_list(NULL);
+                    break;
+                case REQ_PARENT_BUTTON_ID:
+                    // TODO
                     break;
                 case LIST_UP_ID:
                     {
