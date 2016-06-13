@@ -107,23 +107,64 @@ struct FetchInfo
 
 /********************* COMPATIBILITY ***********************/
 
-/* AllocBitMap() is V39, provide a version here, that works on all AmigaOS versions */
-struct BitMap *MyAllocBitMap(ULONG sizex, ULONG sizey, ULONG depth, ULONG flags,
+/*
+ * AllocBitMap() is V39, provide a version here, that works on all AmigaOS versions
+ * Older releases, unfortunately have to do the initialization in a more lengthy way
+ */
+struct BitMap *alloc_bitmap(ULONG sizex, ULONG sizey, ULONG depth, ULONG flags,
                              struct BitMap *friend_bitmap)
 {
     return AllocBitMap(sizex, sizey, depth, flags, friend_bitmap);
 }
 
 /* FreeBitMap() is V39, provide a version here that works on all AmigaOS versions */
-void MyFreeBitMap(struct BitMap *bitmap)
+void free_bitmap(struct BitMap *bitmap)
 {
     FreeBitMap(bitmap);
 }
 
+/*
+  GetBitMapAttr() is V39, provide a version here that works on all AmigaOS versions
+  On older revisions, we simply read the bitmap structure
+*/
 ULONG is_bitmap_interleaved(struct BitMap *bitmap)
 {
-    /* GetBitMapAttr() is V39, provide a version here that works on all AmigaOS versions */
     return (GetBitMapAttr(bitmap, BMA_FLAGS) & BMF_INTERLEAVED) == BMF_INTERLEAVED;
+}
+
+/* Encapsulation of the FindDisplayInfo()/GetDisplayInfo() functions which
+   don't exist in 1.x OS releases, in that case, we can simply return INVALID_ID
+ */
+static ULONG get_mode_id_os3()
+{
+    ULONG modeid = INVALID_ID;
+	struct DimensionInfo diminfo;
+	DisplayInfoHandle	dih;
+
+    if ((dih = FindDisplayInfo(VGAPRODUCT_KEY))) {
+        if (GetDisplayInfoData(dih,(APTR)&diminfo,sizeof(diminfo),DTAG_DIMS,0))	{
+            if (diminfo.MaxDepth >= BLOCKSDEPTH) modeid = VGAPRODUCT_KEY;
+        }
+    }
+    return modeid;
+}
+
+ULONG get_mode_id()
+{
+    ULONG modeid;
+
+	if (option_how)	{
+		modeid = get_mode_id_os3();
+
+		if (modeid == INVALID_ID) {
+			if (option_ntsc) modeid = NTSC_MONITOR_ID | HIRESLACE_KEY;
+			else modeid = PAL_MONITOR_ID | HIRESLACE_KEY;
+		}
+	} else {
+		if (option_ntsc) modeid = NTSC_MONITOR_ID;
+		else modeid = PAL_MONITOR_ID;
+	}
+    return modeid;
 }
 
 /************* SETUP/CLEANUP ROUTINES ***************/
@@ -141,12 +182,12 @@ static void Cleanup(char *msg)
 
 	if (ScreenBitmap) {
 		WaitBlit();
-		MyFreeBitMap(ScreenBitmap);
+        free_bitmap(ScreenBitmap);
 	}
 
 	if (BlocksBitmap) {
 		WaitBlit();
-		MyFreeBitMap(BlocksBitmap);
+		free_bitmap(BlocksBitmap);
 	}
 
 	if (Map) free(Map);
@@ -213,11 +254,11 @@ static void OpenBlocks(void)
 {
 	LONG l;
 
-	if (!(BlocksBitmap = MyAllocBitMap(BLOCKSWIDTH,
-                                       BLOCKSHEIGHT,
-                                       BLOCKSDEPTH,
-                                       BMF_STANDARD | BMF_INTERLEAVED,
-                                       0)))	{
+	if (!(BlocksBitmap = alloc_bitmap(BLOCKSWIDTH,
+                                      BLOCKSHEIGHT,
+                                      BLOCKSDEPTH,
+                                      BMF_STANDARD | BMF_INTERLEAVED,
+                                      0)))	{
 		Cleanup("Can't alloc blocks bitmap!");
 	}
 
@@ -241,16 +282,14 @@ static void OpenBlocks(void)
 	blocksbuffer = BlocksBitmap->Planes[0];
 }
 
-// V36: GetDisplayInfoData(), OpenScreenTags(), FindDisplayInfo()
+// V36: OpenScreenTags()
 static void OpenDisplay(void)
 {
-	struct DimensionInfo diminfo;
-	DisplayInfoHandle	dih;
 	ULONG				modeid;
 	LONG				bmflags;
 
-	if (!(ScreenBitmap = MyAllocBitMap(BITMAPWIDTH,BITMAPHEIGHT + 3,BLOCKSDEPTH,
-                                       BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR,0))) {
+	if (!(ScreenBitmap = alloc_bitmap(BITMAPWIDTH,BITMAPHEIGHT + 3,BLOCKSDEPTH,
+                                      BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR,0))) {
 		Cleanup("Can't alloc screen bitmap!");
 	}
 	frontbuffer = ScreenBitmap->Planes[0];
@@ -263,23 +302,7 @@ static void OpenDisplay(void)
 	if (!is_bitmap_interleaved(ScreenBitmap))	{
 		Cleanup("Screen bitmap is not in interleaved format!??");
 	}
-
-	if (option_how)	{
-		modeid = INVALID_ID;
-
-		if ((dih = FindDisplayInfo(VGAPRODUCT_KEY))) {
-			if (GetDisplayInfoData(dih,(APTR)&diminfo,sizeof(diminfo),DTAG_DIMS,0))	{
-				if (diminfo.MaxDepth >= BLOCKSDEPTH) modeid = VGAPRODUCT_KEY;
-			}
-		}
-		if (modeid == INVALID_ID) {
-			if (option_ntsc) modeid = NTSC_MONITOR_ID | HIRESLACE_KEY;
-			else modeid = PAL_MONITOR_ID | HIRESLACE_KEY;
-		}
-	} else {
-		if (option_ntsc) modeid = NTSC_MONITOR_ID;
-		else modeid = PAL_MONITOR_ID;
-	}
+    modeid = get_mode_id();
 
 	if (!(scr = OpenScreenTags(0,SA_Width,BITMAPWIDTH,
 										  SA_Height,BITMAPHEIGHT + 3,
@@ -523,7 +546,6 @@ static void MainLoop(void)
 
 int main(int argc, char **argv)
 {
-	//OpenLibs();
 	GetArguments();
 	OpenMap();
 	OpenBlocks();
