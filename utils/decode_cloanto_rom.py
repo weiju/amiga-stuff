@@ -41,7 +41,7 @@ if __name__ == '__main__':
     with open(args.romfile, 'rb') as infile:
         file_id = infile.read(len(CLOANTO_ID))
         if file_id == CLOANTO_ID:
-            data = infile.read()            
+            data = infile.read()
             size = len(data)
             if size not in ROM_SIZES:
                 raise Exception("invalid rom size")

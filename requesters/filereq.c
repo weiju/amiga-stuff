@@ -231,6 +231,9 @@ static struct RastPort filelist_rastport;
 
 static UWORD font_baseline, font_height;
 
+#define DIR_BUFFER_SIZE 300
+static char dir_buffer[DIR_BUFFER_SIZE];
+
 static void close_requester()
 {
     if (req_opened) {
@@ -477,8 +480,25 @@ static void handle_events()
                         update_string_gadgets(entry);
                     } else if (entry != NULL && is_doubleclick) {
                         printf("double click on: %s\n", entry->name);
-                        if (entry->file_type == FILETYPE_VOLUME || entry->file_type == FILETYPE_DIR) {
-                            reload_file_list(entry->name);
+                        if (entry->file_type == FILETYPE_VOLUME) {
+                            strncpy(dir_buffer, entry->name, DIR_BUFFER_SIZE);
+                            reload_file_list(dir_buffer);
+                        } else if (entry->file_type == FILETYPE_DIR) {
+                            printf("DIR_BUFFER was: '%s'\n", dir_buffer);
+                            int dblen = strlen(dir_buffer);
+                            // We have to implement the DOS functions AddPart()/PathPart()/FilePart()
+                            // ourselves on 1.x, because they only exist after 2.x
+                            // TODO: maybe put path operations in their own module so
+                            // unit testing becomes possible
+                            // append directory separator to path if not a volume
+                            if (dir_buffer[dblen - 1] != ':' && dblen < DIR_BUFFER_SIZE) {
+                                dir_buffer[dblen] = '/';
+                                dir_buffer[dblen + 1] = '\0';
+                                dblen++;
+                            }
+                            strncat(dir_buffer, entry->name, DIR_BUFFER_SIZE - dblen);
+                            printf("DIR_BUFFER is NOW: '%s'\n", dir_buffer);
+                            reload_file_list(dir_buffer);
                         }
                     }
                 }
@@ -497,6 +517,7 @@ static void handle_events()
                     done = TRUE;
                     break;
                 case REQ_DRIVES_BUTTON_ID:
+                    dir_buffer[0] = '\0';
                     reload_file_list(NULL);
                     break;
                 case REQ_PARENT_BUTTON_ID:
@@ -635,6 +656,7 @@ static void open_request_window(struct Window *window)
         filelist_rastport.BitMap = &filelist_bitmap;
 
         if (req_opened = Request(&requester, req_window)) {
+            dir_buffer[0] = '\0';
             reload_file_list(NULL);
             handle_events();
             free_file_list(current_files);

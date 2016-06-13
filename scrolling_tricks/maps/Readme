@@ -1,0 +1,11 @@
+The demo programs don't load these PowerCrawler MAP Files but the
+corresponding RAW files which are in this directory as well. The 
+RAW files were created with the RAW-IO Saver included in the
+PowerCrawler package.
+
+----------------------------------------------------------------------------
+
+Die Demoprogramme laden nicht diese PowerCrawler MAP Dateien, sondern
+die entsprechenden RAW Dateien, die sich ebenfalls in diesem Verzeichnis
+befinden. Die RAW Dateien wurden mit dem RAW-IO Saver erzeugt, der Teil
+des PowerCrawler Paketes ist.
