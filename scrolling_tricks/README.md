@@ -1,9 +1,13 @@
 # Scrolling Tricks
 
 This is a project to rework the Aminet Scrolling Tricks by Georg Steger into a
-version that works on all Amiga OS releases from 1.3 and has
-higher reuse. The ScrollingTricks tutorial has tremendous learning
-value, but requires at least AmigaOS3.0 to run
+version that has higher internal reuse, is smaller and compiles with
+VBCC. The purpose is mainly to better understand the algorithms
+
+# System Requirements
+
+This software requires V39 libraries and therefore only runs on the
+3.x releases or greater of AmigaOS
 
 ## Original source
 

@@ -107,35 +107,12 @@ struct FetchInfo
 
 /********************* COMPATIBILITY ***********************/
 
-/*
- * AllocBitMap() is V39, provide a version here, that works on all AmigaOS versions
- * Older releases, unfortunately have to do the initialization in a more lengthy way
- */
-struct BitMap *alloc_bitmap(ULONG sizex, ULONG sizey, ULONG depth, ULONG flags,
-                             struct BitMap *friend_bitmap)
-{
-    return AllocBitMap(sizex, sizey, depth, flags, friend_bitmap);
-}
-
-/* FreeBitMap() is V39, provide a version here that works on all AmigaOS versions */
-void free_bitmap(struct BitMap *bitmap)
-{
-    FreeBitMap(bitmap);
-}
-
-/*
-  GetBitMapAttr() is V39, provide a version here that works on all AmigaOS versions
-  On older revisions, we simply read the bitmap structure
-*/
 ULONG is_bitmap_interleaved(struct BitMap *bitmap)
 {
     return (GetBitMapAttr(bitmap, BMA_FLAGS) & BMF_INTERLEAVED) == BMF_INTERLEAVED;
 }
 
-/* Encapsulation of the FindDisplayInfo()/GetDisplayInfo() functions which
-   don't exist in 1.x OS releases, in that case, we can simply return INVALID_ID
- */
-static ULONG get_mode_id_os3()
+static ULONG get_mode_id_os3(void)
 {
     ULONG modeid = INVALID_ID;
 	struct DimensionInfo diminfo;
@@ -149,7 +126,7 @@ static ULONG get_mode_id_os3()
     return modeid;
 }
 
-ULONG get_mode_id()
+ULONG get_mode_id(void)
 {
     ULONG modeid;
 
@@ -182,12 +159,12 @@ static void Cleanup(char *msg)
 
 	if (ScreenBitmap) {
 		WaitBlit();
-        free_bitmap(ScreenBitmap);
+        FreeBitMap(ScreenBitmap);
 	}
 
 	if (BlocksBitmap) {
 		WaitBlit();
-		free_bitmap(BlocksBitmap);
+		FreeBitMap(BlocksBitmap);
 	}
 
 	if (Map) free(Map);
@@ -254,11 +231,11 @@ static void OpenBlocks(void)
 {
 	LONG l;
 
-	if (!(BlocksBitmap = alloc_bitmap(BLOCKSWIDTH,
-                                      BLOCKSHEIGHT,
-                                      BLOCKSDEPTH,
-                                      BMF_STANDARD | BMF_INTERLEAVED,
-                                      0)))	{
+	if (!(BlocksBitmap = AllocBitMap(BLOCKSWIDTH,
+                                     BLOCKSHEIGHT,
+                                     BLOCKSDEPTH,
+                                     BMF_STANDARD | BMF_INTERLEAVED,
+                                     0)))	{
 		Cleanup("Can't alloc blocks bitmap!");
 	}
 
@@ -282,14 +259,13 @@ static void OpenBlocks(void)
 	blocksbuffer = BlocksBitmap->Planes[0];
 }
 
-// V36: OpenScreenTags()
 static void OpenDisplay(void)
 {
 	ULONG				modeid;
 	LONG				bmflags;
 
-	if (!(ScreenBitmap = alloc_bitmap(BITMAPWIDTH,BITMAPHEIGHT + 3,BLOCKSDEPTH,
-                                      BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR,0))) {
+	if (!(ScreenBitmap = AllocBitMap(BITMAPWIDTH,BITMAPHEIGHT + 3,BLOCKSDEPTH,
+                                     BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR,0))) {
 		Cleanup("Can't alloc screen bitmap!");
 	}
 	frontbuffer = ScreenBitmap->Planes[0];
@@ -379,7 +355,7 @@ static void InitCopperlist(void)
 
 /******************* SCROLLING **********************/
 
-static void DrawBlock(LONG x,LONG y,LONG mapx,LONG mapy)
+static void DrawBlock(LONG x, LONG y, LONG mapx, LONG mapy)
 {
 	UBYTE block;
 

@@ -2,7 +2,7 @@ ASM=vasmm68k_mot
 ASM_FLAGS = -Fhunk -devpac
 .SUFFIXES = .o .asm .c
 
-CC=vc +kick13
+CC=vc +aos68k
 CFLAGS=-c99 -I$(NDK_INC) -DDEBUG
 
 all: main
