@@ -158,3 +158,16 @@ BOOL JoyLeft(void) { return (custom->joy1dat & 512) ? TRUE : FALSE; }
 BOOL JoyRight(void) { return (custom->joy1dat & 2) ? TRUE : FALSE; }
 BOOL JoyFire(void) { return ((*(UBYTE *)0xbfe001) & 128) ? FALSE : TRUE; }
 BOOL LMBDown(void) { return ((*(UBYTE *)0xbfe001) & 64) ? FALSE : TRUE; }
+BOOL JoyUp(void)
+{
+	// ^ = xor
+	WORD w = custom->joy1dat << 1;
+	return ((w ^ custom->joy1dat) & 512) ? TRUE : FALSE;
+}
+
+BOOL JoyDown(void)
+{
+	// ^ = xor
+	WORD w = custom->joy1dat << 1;
+	return ((w ^ custom->joy1dat) & 2) ? TRUE : FALSE;
+}

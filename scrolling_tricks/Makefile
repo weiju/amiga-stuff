@@ -5,20 +5,23 @@ ASM_FLAGS = -Fhunk -devpac
 CC=vc +aos68k
 CFLAGS=-c99 -I$(NDK_INC) -DDEBUG
 
-all: xunlimited xlimited
+all: xunlimited xlimited xylimited
 
 clean:
 	rm -f xunlimited xlimited *.o
 
-cop_x.o: cop_x.asm
-	$(ASM) $(ASM_FLAGS) -o $@ $<
-
-.c.o:
+%.o: %.c
 	$(CC) $(CFLAGS)  -c -o $@ $^
+
+%.o: %.asm
+	$(ASM) $(ASM_FLAGS) -o $@ $<
 
 xunlimited: hardware.o cop_x.o common.o xunlimited.o
 	$(CC) -o $@ $^ -lamiga -lauto
 
 
 xlimited: hardware.o cop_x.o common.o xlimited.o
+	$(CC) -o $@ $^ -lamiga -lauto
+
+xylimited: hardware.o cop_xy.o common.o xylimited.o
 	$(CC) -o $@ $^ -lamiga -lauto
