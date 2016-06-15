@@ -1,5 +1,6 @@
 #include <clib/graphics_protos.h>
 #include <clib/dos_protos.h>
+#include <clib/exec_protos.h>
 #include <string.h>
 
 #include "global_defs.h"
@@ -66,5 +67,40 @@ BOOL get_arguments(struct PrgOptions *options, char *s)
         strcpy(s, "Invalid fetch mode. Must be 0 .. 3!");
         return FALSE;
 	}
+    return TRUE;
+}
+
+BOOL read_level_map(struct LevelMap *level_map, char *s)
+{
+	LONG l;
+    BPTR fhandle;
+    struct RawMap *raw_map;
+
+	if (!(fhandle = Open(MAPNAME, MODE_OLDFILE)))
+	{
+		Fault(IoErr(), 0, s, 255);
+		return FALSE;
+	}
+
+	Seek(fhandle, 0, OFFSET_END);
+	l = Seek(fhandle, 0, OFFSET_BEGINNING);
+
+	if (!(raw_map = AllocVec(l, MEMF_PUBLIC))) {
+		strcpy(s, "Out of memory!");
+        if (fhandle) Close(fhandle);
+        return FALSE;
+	}
+
+	if (Read(fhandle, raw_map, l) != l)
+	{
+		Fault(IoErr(), 0, s, 255);
+        if (fhandle) Close(fhandle);
+        return FALSE;
+	}
+	Close(fhandle);
+
+	level_map->data = raw_map->data;
+	level_map->width = raw_map->mapwidth;
+	level_map->height = raw_map->mapheight;
     return TRUE;
 }

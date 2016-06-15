@@ -16,8 +16,6 @@
 
 #include "hardware.h"
 #include "cop.h"
-#include "map.h"
-
 #include "global_defs.h"
 #include "common.h"
 
@@ -39,7 +37,6 @@
 struct Screen *scr;
 struct RastPort *ScreenRastPort;
 struct BitMap *BlocksBitmap,*ScreenBitmap;
-struct RawMap *Map;
 UBYTE	 *frontbuffer,*blocksbuffer;
 
 WORD	mapposx,videoposx;
@@ -48,8 +45,7 @@ BYTE	previous_direction;
 WORD	*savewordpointer;
 WORD	saveword;
 
-LONG	mapwidth,mapheight;
-UBYTE *mapdata;
+struct LevelMap level_map;
 
 UWORD	colors[BLOCKSCOLORS];
 
@@ -109,41 +105,10 @@ static void Cleanup (char *msg)
 		FreeBitMap(BlocksBitmap);
 	}
 
-	if (Map) FreeVec(Map);
+	if (level_map.raw_map) FreeVec(level_map.raw_map);
+
 	if (MyHandle) Close(MyHandle);
 	exit(rc);
-}
-
-static void OpenMap(void)
-{
-	LONG l;
-
-	if (!(MyHandle = Open(MAPNAME,MODE_OLDFILE)))
-	{
-		Fault(IoErr(),0,s,255);
-		Cleanup(s);
-	}
-
-	Seek(MyHandle,0,OFFSET_END);
-	l = Seek(MyHandle,0,OFFSET_BEGINNING);
-
-	if (!(Map = AllocVec(l,MEMF_PUBLIC)))
-	{
-		Cleanup("Out of memory!");
-	}
-
-	if (Read(MyHandle,Map,l) != l)
-	{
-		Fault(IoErr(),0,s,255);
-		Cleanup(s);
-	}
-
-	Close(MyHandle);
-    MyHandle = 0;
-
-	mapdata = Map->data;
-	mapwidth = Map->mapwidth;
-	mapheight = Map->mapheight;
 }
 
 static void OpenBlocks(void)
@@ -184,7 +149,7 @@ static void OpenDisplay(void)
 	ULONG						modeid;
 
 	bitmapheight = BITMAPHEIGHT +
-						(mapwidth / BITMAPBLOCKSPERROW / BLOCKSDEPTH) + 1 +
+						(level_map.width / BITMAPBLOCKSPERROW / BLOCKSDEPTH) + 1 +
 						3;
 
 	if (!(ScreenBitmap = AllocBitMap(BITMAPWIDTH,bitmapheight,BLOCKSDEPTH,BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR,0)))
@@ -291,7 +256,7 @@ static void DrawBlock(LONG x, LONG y, LONG mapx, LONG mapy)
 	x = (x / 8) & 0xFFFE;
 	y = y * BITMAPBYTESPERROW;
 
-	block = mapdata[mapy * mapwidth + mapx];
+	block = level_map.data[mapy * level_map.width + mapx];
 
 	mapx = (block % BLOCKSPERROW) * (BLOCKWIDTH / 8);
 	mapy = (block / BLOCKSPERROW) * (BLOCKPLANELINES * BLOCKSBYTESPERROW);
@@ -356,7 +321,7 @@ static void ScrollRight(void)
 {
 	WORD mapx,mapy,x,y;
 
-	if (mapposx >= (mapwidth * BLOCKWIDTH - SCREENWIDTH - BLOCKWIDTH)) return;
+	if (mapposx >= (level_map.width * BLOCKWIDTH - SCREENWIDTH - BLOCKWIDTH)) return;
 
 	mapx = mapposx / BLOCKWIDTH + BITMAPBLOCKSPERROW;
 	mapy = mapposx & (NUMSTEPS - 1);
@@ -480,8 +445,9 @@ int main(int argc, char **argv)
 {
 	BOOL res = get_arguments(&options, s);
     if (!res) Cleanup(s);
+	res = read_level_map(&level_map, s);
+    if (!res) Cleanup(s);
 
-	OpenMap();
 	OpenBlocks();
 	OpenDisplay();
 
