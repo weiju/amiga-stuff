@@ -46,12 +46,8 @@ LONG	mapwidth;
 UBYTE *mapdata;
 
 UWORD	colors[BLOCKSCOLORS];
-LONG	Args[NUM_ARGS];
 
 struct PrgOptions options;
-BOOL	option_ntsc,option_how,option_speed,option_sky;
-WORD	option_fetchmode;
-
 BPTR	MyHandle;
 char	s[256];
 
@@ -89,34 +85,6 @@ static void Cleanup(char *msg)
 	if (Map) free(Map);
 	if (MyHandle) Close(MyHandle);
 	exit(rc);
-}
-
-static void GetArguments(struct PrgOptions *options)
-{
-	struct RDArgs *MyArgs;
-
-	if (!(MyArgs = ReadArgs(ARG_TEMPLATE,Args,0))) {
-		Fault(IoErr(),0,s,255);
-		Cleanup(s);
-	}
-
-	if (Args[ARG_SPEED]) option_speed = TRUE;
-	if (Args[ARG_NTSC]) option_ntsc = TRUE;
-	if (Args[ARG_HOW]) {
-		option_how = TRUE;
-		option_speed = FALSE;
-	}
-	if (Args[ARG_SKY] && (!option_speed)) {
-		option_sky = TRUE;
-	}
-	if (Args[ARG_FMODE]) {
-		option_fetchmode = *(LONG *)Args[ARG_FMODE];
-	}
-	FreeArgs(MyArgs);
-
-	if (option_fetchmode < 0 || option_fetchmode > 3) {
-		Cleanup("Invalid fetch mode. Must be 0 .. 3!");
-	}
 }
 
 static void OpenMap(void)
@@ -189,7 +157,7 @@ static void OpenDisplay(void)
 		Cleanup("Can't alloc screen bitmap!");
 	}
 	frontbuffer = ScreenBitmap->Planes[0];
-	frontbuffer += (fetchinfo[option_fetchmode].bitmapoffset / 8);
+	frontbuffer += (fetchinfo[options.fetchmode].bitmapoffset / 8);
 
 	if (!(TypeOfMem(ScreenBitmap->Planes[0]) & MEMF_CHIP)) {
 		Cleanup("Screen bitmap is not in CHIP RAM!?? If you have a gfx card try disabling \"planes to fast\" or similiar options in your RTG system!");
@@ -198,15 +166,15 @@ static void OpenDisplay(void)
 	if (!IS_BITMAP_INTERLEAVED(ScreenBitmap))	{
 		Cleanup("Screen bitmap is not in interleaved format!??");
 	}
-    modeid = get_mode_id(option_how, option_ntsc);
+    modeid = get_mode_id(options.how, options.ntsc);
 
 	if (!(scr = OpenScreenTags(0,SA_Width,BITMAPWIDTH,
 										  SA_Height,BITMAPHEIGHT + 3,
 										  SA_Depth,BLOCKSDEPTH,
 										  SA_DisplayID,modeid,
 										  SA_BitMap,ScreenBitmap,
-										  option_how ? SA_Overscan : TAG_IGNORE,OSCAN_TEXT,
-										  option_how ? SA_AutoScroll : TAG_IGNORE,TRUE,
+										  options.how ? SA_Overscan : TAG_IGNORE,OSCAN_TEXT,
+										  options.how ? SA_AutoScroll : TAG_IGNORE,TRUE,
 										  SA_Quiet,TRUE,
 										  TAG_DONE))) {
 		Cleanup("Can't open screen!");
@@ -226,21 +194,21 @@ static void InitCopperlist(void)
 
 	WaitVBL();
 	custom->dmacon = 0x7FFF;
-	custom->beamcon0 = option_ntsc ? 0 : DISPLAYPAL;
-	CopFETCHMODE[1] = option_fetchmode;
+	custom->beamcon0 = options.ntsc ? 0 : DISPLAYPAL;
+	CopFETCHMODE[1] = options.fetchmode;
 
 	// bitplane control registers
 	CopBPLCON0[1] = ((BLOCKSDEPTH * BPL0_BPU0_F) & BPL0_BPUMASK) +
 						 ((BLOCKSDEPTH / 8) * BPL0_BPU3_F) +
 						 BPL0_COLOR_F +
-						 (option_speed ? 0 : BPL0_USEBPLCON3_F);
+						 (options.speed ? 0 : BPL0_USEBPLCON3_F);
 
 	CopBPLCON1[1] = 0;
 	CopBPLCON3[1] = BPLCON3_BRDNBLNK;
 
 	// bitplane modulos
 	l = BITMAPBYTESPERROW * BLOCKSDEPTH -
-		 SCREENBYTESPERROW - fetchinfo[option_fetchmode].modulooffset;
+		 SCREENBYTESPERROW - fetchinfo[options.fetchmode].modulooffset;
 
 	CopBPLMODA[1] = l;
 	CopBPLMODB[1] = l;
@@ -250,8 +218,8 @@ static void InitCopperlist(void)
 	CopDIWSTOP[1] = DIWSTOP;
 
 	// display data fetch start/stop
-	CopDDFSTART[1] = fetchinfo[option_fetchmode].ddfstart;
-	CopDDFSTOP[1]  = fetchinfo[option_fetchmode].ddfstop;
+	CopDDFSTART[1] = fetchinfo[options.fetchmode].ddfstart;
+	CopDDFSTOP[1]  = fetchinfo[options.fetchmode].ddfstop;
 
 	// plane pointers
 
@@ -263,7 +231,7 @@ static void InitCopperlist(void)
 		wp += 4;
 	}
 
-	if (option_sky) {
+	if (options.sky) {
 		// activate copper sky
 		CopSKY[0] = 0x290f;
 	}
@@ -289,7 +257,7 @@ static void DrawBlock(LONG x, LONG y, LONG mapx, LONG mapy)
 	mapx = (block % BLOCKSPERROW) * (BLOCKWIDTH / 8);
 	mapy = (block / BLOCKSPERROW) * (BLOCKPLANELINES * BLOCKSBYTESPERROW);
 
-	if (option_how) OwnBlitter();
+	if (options.how) OwnBlitter();
 
 	HardWaitBlit();
 
@@ -303,7 +271,7 @@ static void DrawBlock(LONG x, LONG y, LONG mapx, LONG mapy)
 	custom->bltdpt	 = frontbuffer + y + x;
 	custom->bltsize = BLOCKPLANELINES * 64 + (BLOCKWIDTH / 16);
 
-	if (option_how) DisownBlitter();
+	if (options.how) DisownBlitter();
 }
 
 static void FillScreen(void)
@@ -378,7 +346,7 @@ static void UpdateCopperlist(void)
 	WORD	xpos,planeaddx,scroll,i;
 	WORD	*wp;
 
-	i = fetchinfo[option_fetchmode].scrollpixels;
+	i = fetchinfo[options.fetchmode].scrollpixels;
 
 	xpos = videoposx + i - 1;
 
@@ -415,7 +383,7 @@ static void ShowWhatCopperWouldDo(void)
 
 static void MainLoop(void)
 {
-	if (!option_how) {
+	if (!options.how) {
 		// activate copperlist
 		HardWaitBlit();
 		WaitVBL();
@@ -423,17 +391,17 @@ static void MainLoop(void)
 	}
 
 	while (!LMBDown()) {
-		if (!option_how) {
+		if (!options.how) {
 			WaitVBeam(199);
 			WaitVBeam(200);
 		} else Delay(1);
 
-		if (option_speed) *(WORD *)0xdff180 = 0xFF0;
+		if (options.speed) *(WORD *)0xdff180 = 0xFF0;
 
 		CheckJoyScroll();
 
-		if (option_speed) *(WORD *)0xdff180 = 0xF00;
-		if (!option_how) UpdateCopperlist();
+		if (options.speed) *(WORD *)0xdff180 = 0xF00;
+		if (!options.how) UpdateCopperlist();
 		else ShowWhatCopperWouldDo();
 	}
 }
@@ -442,12 +410,13 @@ static void MainLoop(void)
 
 int main(int argc, char **argv)
 {
-	GetArguments(&options);
+	BOOL res = get_arguments(&options, s);
+    if (!res) Cleanup(s);
 	OpenMap();
 	OpenBlocks();
 	OpenDisplay();
 
-	if (!option_how) {
+	if (!options.how) {
 		Delay(2*50);
 		KillSystem();
 		InitCopperlist();
@@ -455,7 +424,7 @@ int main(int argc, char **argv)
 	FillScreen();
 	MainLoop();
 
-	if (!option_how) ActivateSystem();
+	if (!options.how) ActivateSystem();
 	Cleanup(0);
     return 0;
 }
