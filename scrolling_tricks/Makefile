@@ -10,15 +10,15 @@ all: xunlimited xlimited
 clean:
 	rm -f xunlimited xlimited *.o
 
-cop.o: cop.asm
+cop_x.o: cop_x.asm
 	$(ASM) $(ASM_FLAGS) -o $@ $<
 
 .c.o:
 	$(CC) $(CFLAGS)  -c -o $@ $^
 
-xunlimited: hardware.o cop.o common.o xunlimited.o
+xunlimited: hardware.o cop_x.o common.o xunlimited.o
 	$(CC) -o $@ $^ -lamiga -lauto
 
 
-xlimited: hardware.o cop.o common.o xlimited.o
+xlimited: hardware.o cop_x.o common.o xlimited.o
 	$(CC) -o $@ $^ -lamiga -lauto
