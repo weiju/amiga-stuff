@@ -1,0 +1,4 @@
+#ifndef EXAMPLE_EXAMPLE_H
+#define EXAMPLE_EXAMPLE_H
+
+#endif /* EXAMPLE_EXAMPLE_H */
