@@ -104,3 +104,43 @@ BOOL read_level_map(struct LevelMap *level_map, char *s)
 	level_map->height = raw_map->mapheight;
     return TRUE;
 }
+
+struct BitMap *read_blocks(UWORD *colors, char *s)
+{
+	LONG l;
+    struct BitMap *bitmap;
+    BPTR fhandle;
+
+	if (!(bitmap = AllocBitMap(BLOCKSWIDTH,
+                               BLOCKSHEIGHT,
+                               BLOCKSDEPTH,
+                               BMF_STANDARD | BMF_INTERLEAVED,
+                               0))) {
+		strcpy(s, "Can't alloc blocks bitmap!");
+        return NULL;
+	}
+
+	if (!(fhandle = Open(BLOCKSNAME,MODE_OLDFILE))) {
+		Fault(IoErr(), 0, s, 255);
+        FreeBitMap(bitmap);
+		return NULL;
+	}
+
+	if (Read(fhandle, colors, PALSIZE) != PALSIZE) {
+		Fault(IoErr(), 0, s, 255);
+        FreeBitMap(bitmap);
+        Close(fhandle);
+        return NULL;
+	}
+
+	l = BLOCKSWIDTH * BLOCKSHEIGHT * BLOCKSDEPTH / 8;
+
+	if (Read(fhandle, bitmap->Planes[0], l) != l) {
+		Fault(IoErr(), 0, s, 255);
+        FreeBitMap(bitmap);
+        Close(fhandle);
+        return NULL;
+	}
+	Close(fhandle);
+    return bitmap;
+}

@@ -37,7 +37,7 @@ struct Screen *scr;
 struct RastPort *ScreenRastPort;
 struct BitMap *BlocksBitmap, *ScreenBitmap;
 
-UBYTE	 *frontbuffer,*blocksbuffer;
+UBYTE	 *frontbuffer, *blocksbuffer;
 
 WORD	mapposx,videoposx;
 
@@ -46,7 +46,6 @@ struct LevelMap level_map;
 UWORD	colors[BLOCKSCOLORS];
 
 struct PrgOptions options;
-BPTR	MyHandle;
 char	s[256];
 
 struct FetchInfo fetchinfo [] =
@@ -81,41 +80,7 @@ static void Cleanup(char *msg)
 	}
 
 	if (level_map.raw_map) free(level_map.raw_map);
-	if (MyHandle) Close(MyHandle);
 	exit(rc);
-}
-
-static void OpenBlocks(void)
-{
-	LONG l;
-
-	if (!(BlocksBitmap = AllocBitMap(BLOCKSWIDTH,
-                                     BLOCKSHEIGHT,
-                                     BLOCKSDEPTH,
-                                     BMF_STANDARD | BMF_INTERLEAVED,
-                                     0))) {
-		Cleanup("Can't alloc blocks bitmap!");
-	}
-
-	if (!(MyHandle = Open(BLOCKSNAME,MODE_OLDFILE))) {
-		Fault(IoErr(),0,s,255);
-		Cleanup(s);
-	}
-
-	if (Read(MyHandle,colors,PALSIZE) != PALSIZE) {
-		Fault(IoErr(),0,s,255);
-		Cleanup(s);
-	}
-
-	l = BLOCKSWIDTH * BLOCKSHEIGHT * BLOCKSDEPTH / 8;
-
-	if (Read(MyHandle,BlocksBitmap->Planes[0],l) != l) {
-		Fault(IoErr(),0,s,255);
-		Cleanup(s);
-	}
-	Close(MyHandle);
-    MyHandle = 0;
-	blocksbuffer = BlocksBitmap->Planes[0];
 }
 
 static void OpenDisplay(void)
@@ -386,7 +351,10 @@ int main(int argc, char **argv)
 	res = read_level_map(&level_map, s);
     if (!res) Cleanup(s);
 
-	OpenBlocks();
+	BlocksBitmap = read_blocks(colors, s);
+    if (!BlocksBitmap) Cleanup(s);
+	blocksbuffer = BlocksBitmap->Planes[0];
+
 	OpenDisplay();
 
 	if (!options.how) {
