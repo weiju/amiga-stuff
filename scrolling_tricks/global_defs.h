@@ -38,4 +38,7 @@
 
 #define PALSIZE (BLOCKSCOLORS * 2)
 
+#define IS_BITMAP_INTERLEAVED(bitmap)  ((GetBitMapAttr(bitmap, BMA_FLAGS) & BMF_INTERLEAVED) == BMF_INTERLEAVED)
+#define ROUND2BLOCKWIDTH(x) ((x) & ~(BLOCKWIDTH - 1))
+
 #endif /* __GLOBAL_DEFS_H__ */

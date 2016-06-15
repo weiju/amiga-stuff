@@ -16,9 +16,9 @@ cop.o: cop.asm
 .c.o:
 	$(CC) $(CFLAGS)  -c -o $@ $^
 
-xunlimited: hardware.o cop.o xunlimited.o
+xunlimited: hardware.o cop.o common.o xunlimited.o
 	$(CC) -o $@ $^ -lamiga -lauto
 
 
-xlimited: hardware.o cop.o xlimited.o
+xlimited: hardware.o cop.o common.o xlimited.o
 	$(CC) -o $@ $^ -lamiga -lauto

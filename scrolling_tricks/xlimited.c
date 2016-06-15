@@ -19,6 +19,7 @@
 #include "map.h"
 
 #include "global_defs.h"
+#include "common.h"
 
 
 #define BITMAPWIDTH (SCREENWIDTH + EXTRAWIDTH)
@@ -80,24 +81,13 @@ char	s[256];
 
 #endif
 
-struct FetchInfo
-{
-	WORD	ddfstart;
-	WORD	ddfstop;
-	WORD	modulooffset;
-	WORD	bitmapoffset;
-	WORD	scrollpixels;
-} fetchinfo [] =
+struct FetchInfo fetchinfo [] =
 {
 	{0x30,0xD0,2,0,16},	/* normal         */
 	{0x28,0xC8,4,16,32},	/* BPL32          */
 	{0x28,0xC8,4,16,32},	/* BPAGEM         */
 	{0x18,0xB8,8,48,64}	/* BPL32 + BPAGEM */
 };
-
-/********************* MACROS ***********************/
-
-#define ROUND2BLOCKWIDTH(x) ((x) & ~(BLOCKWIDTH - 1))
 
 /************* SETUP/CLEANUP ROUTINES ***************/
 
@@ -203,50 +193,41 @@ static void OpenBlocks(void)
 	LONG l;
 
 	if (!(BlocksBitmap = AllocBitMap(BLOCKSWIDTH,
-											   BLOCKSHEIGHT,
-											   BLOCKSDEPTH,
-											   BMF_STANDARD | BMF_INTERLEAVED,
-											   0)))
-	{
+                                     BLOCKSHEIGHT,
+                                     BLOCKSDEPTH,
+                                     BMF_STANDARD | BMF_INTERLEAVED,
+                                     0))) {
 		Cleanup("Can't alloc blocks bitmap!");
 	}
 
-	if (!(MyHandle = Open(BLOCKSNAME,MODE_OLDFILE)))
-	{
+	if (!(MyHandle = Open(BLOCKSNAME,MODE_OLDFILE))) {
 		Fault(IoErr(),0,s,255);
 		Cleanup(s);
 	}
 
-	if (Read(MyHandle,colors,PALSIZE) != PALSIZE)
-	{
+	if (Read(MyHandle,colors,PALSIZE) != PALSIZE) {
 		Fault(IoErr(),0,s,255);
 		Cleanup(s);
 	}
 
 	l = BLOCKSWIDTH * BLOCKSHEIGHT * BLOCKSDEPTH / 8;
 
-	if (Read(MyHandle,BlocksBitmap->Planes[0],l) != l)
-	{
+	if (Read(MyHandle,BlocksBitmap->Planes[0],l) != l) {
 		Fault(IoErr(),0,s,255);
 		Cleanup(s);
 	}
-	
-	Close(MyHandle);MyHandle = 0;
-	
+	Close(MyHandle);
+    MyHandle = 0;
 	blocksbuffer = BlocksBitmap->Planes[0];
 }
 
 static void OpenDisplay(void)
-{	
-	struct DimensionInfo diminfo;
-	DisplayInfoHandle 	dih;
+{
 	ULONG						modeid;
-	LONG						l;
-	
+
 	bitmapheight = BITMAPHEIGHT +
 						(mapwidth / BITMAPBLOCKSPERROW / BLOCKSDEPTH) + 1 +
 						3;
-						
 
 	if (!(ScreenBitmap = AllocBitMap(BITMAPWIDTH,bitmapheight,BLOCKSDEPTH,BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR,0)))
 	{
@@ -261,42 +242,11 @@ static void OpenDisplay(void)
 		Cleanup("Screen bitmap is not in CHIP RAM!?? If you have a gfx card try disabling \"planes to fast\" or similiar options in your RTG system!");
 	}
 
-	l = GetBitMapAttr(ScreenBitmap,BMA_FLAGS);
-	
-	if (!(GetBitMapAttr(ScreenBitmap,BMA_FLAGS) & BMF_INTERLEAVED))
-	{
+	if (!IS_BITMAP_INTERLEAVED(ScreenBitmap)) {
 		Cleanup("Screen bitmap is not in interleaved format!??");
 	}
-	
-	if (option_how)
-	{
-		modeid = INVALID_ID;
 
-		if ((dih = FindDisplayInfo(VGAPRODUCT_KEY)))
-		{
-			if (GetDisplayInfoData(dih,(APTR)&diminfo,sizeof(diminfo),DTAG_DIMS,0))
-			{
-				if (diminfo.MaxDepth >= BLOCKSDEPTH) modeid = VGAPRODUCT_KEY;
-			}
-		}
-		if (modeid == INVALID_ID)
-		{
-			if (option_ntsc)
-			{
-				modeid = NTSC_MONITOR_ID | HIRESLACE_KEY;
-			} else {
-				modeid = PAL_MONITOR_ID | HIRESLACE_KEY;
-			}
-		}
-	} else {
-		if (option_ntsc)
-		{
-			modeid = NTSC_MONITOR_ID;
-		} else {
-			modeid = PAL_MONITOR_ID;
-		}
-	}
-
+    modeid = get_mode_id(option_how, option_ntsc);
 	if (!(scr = OpenScreenTags(0,SA_Width,BITMAPWIDTH,
 										  SA_Height,bitmapheight,
 										  SA_Depth,BLOCKSDEPTH,
