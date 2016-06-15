@@ -8,7 +8,7 @@ CFLAGS=-c99 -I$(NDK_INC) -DDEBUG
 all: xunlimited xlimited
 
 clean:
-	rm -f xunlimited xlimited hardware.o cop.o main.o
+	rm -f xunlimited xlimited *.o
 
 cop.o: cop.asm
 	$(ASM) $(ASM_FLAGS) -o $@ $<
