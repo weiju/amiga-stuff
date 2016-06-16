@@ -44,11 +44,16 @@
 #define BITMAPPLANELINES (BITMAPHEIGHT * BLOCKSDEPTH)
 #define BLOCKPLANELINES  (BLOCKHEIGHT * BLOCKSDEPTH)
 
+#define PLANEPIXELBITMAPWIDTH (BITMAPWIDTH * BLOCKSDEPTH)
+
 #define BLOCKSFILESIZE (BLOCKSWIDTH * BLOCKSHEIGHT * BLOCKSPLANES / 8 + PALSIZE)
 
 #define DIRECTION_IGNORE 0
 #define DIRECTION_LEFT   1
 #define DIRECTION_RIGHT  2
+
+#define UP 1
+#define DOWN 2
 
 // calculate how many times (steps) y-scrolling needs to
 // blit two blocks instead of one block to make sure a
@@ -107,24 +112,12 @@ struct FetchInfo fetchinfo [] =
 	{0x18,0xB8,8,48,64}	/* BPL32 + BPAGEM */
 };
 
-/********************* MACROS ***********************/
-
-#define ADJUSTDESTCOORDS(x,y) 		\
-	if (x >= BITMAPWIDTH)				\
-	{											\
-		x -= BITMAPWIDTH;					\
-		y++;									\
-		if (y >= BITMAPPLANELINES)		\
-		{										\
-			y -= BITMAPPLANELINES;		\
-		}										\
-	}
-
 /************* SETUP/CLEANUP ROUTINES ***************/
 
 static void Cleanup (char *msg)
 {
 	WORD rc;
+
 	if (msg) {
 		printf("Error: %s\n",msg);
 		rc = RETURN_WARN;
@@ -160,14 +153,17 @@ static void OpenDisplay(void)
                                      BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR,0))) {
 		Cleanup("Can't alloc screen bitmap!");
 	}
+
 	frontbuffer = ScreenBitmap->Planes[0];
 	frontbuffer += (fetchinfo[options.fetchmode].bitmapoffset / 8);
 
 	if (!(TypeOfMem(ScreenBitmap->Planes[0]) & MEMF_CHIP)) {
 		Cleanup("Screen bitmap is not in CHIP RAM!?? If you have a gfx card try disabling \"planes to fast\" or similiar options in your RTG system!");
 	}
+
 	l = GetBitMapAttr(ScreenBitmap,BMA_FLAGS);
-	if (!(GetBitMapAttr(ScreenBitmap,BMA_FLAGS) & BMF_INTERLEAVED)) {
+
+	if (!(GetBitMapAttr(ScreenBitmap,BMA_FLAGS) & BMF_INTERLEAVED))	{
 		Cleanup("Screen bitmap is not in interleaved format!??");
 	}
 
@@ -180,16 +176,15 @@ static void OpenDisplay(void)
 										  options.how ? SA_Overscan : TAG_IGNORE,OSCAN_TEXT,
 										  options.how ? SA_AutoScroll : TAG_IGNORE,TRUE,
 										  SA_Quiet,TRUE,
-										  TAG_DONE)))
-	{
+										  TAG_DONE))) {
 		Cleanup("Can't open screen!");
 	}
 
-	if (scr->RastPort.BitMap->Planes[0] != ScreenBitmap->Planes[0]) {
+	if (scr->RastPort.BitMap->Planes[0] != ScreenBitmap->Planes[0])	{
 		Cleanup("Screen was not created with the custom bitmap I supplied!??");
 	}
 	ScreenRastPort = &scr->RastPort;
-	LoadRGB4(&scr->ViewPort, colors, BLOCKSCOLORS);
+	LoadRGB4(&scr->ViewPort,colors,BLOCKSCOLORS);
 }
 
 static void InitCopperlist(void)
@@ -206,15 +201,18 @@ static void InitCopperlist(void)
 	CopFETCHMODE[1] = options.fetchmode;
 
 	// bitplane control registers
+
 	CopBPLCON0[1] = ((BLOCKSDEPTH * BPL0_BPU0_F) & BPL0_BPUMASK) +
 						 ((BLOCKSDEPTH / 8) * BPL0_BPU3_F) +
 						 BPL0_COLOR_F +
 						 (options.speed ? 0 : BPL0_USEBPLCON3_F);
 
 	CopBPLCON1[1] = 0;
+
 	CopBPLCON3[1] = BPLCON3_BRDNBLNK;
 
 	// bitplane modulos
+
 	l = BITMAPBYTESPERROW * BLOCKSDEPTH -
 		 SCREENBYTESPERROW - fetchinfo[options.fetchmode].modulooffset;
 
@@ -231,30 +229,34 @@ static void InitCopperlist(void)
 	CopDIWSTOP[1] = DIWSTOP;
 
 	// display data fetch start/stop
-
 	CopDDFSTART[1] = fetchinfo[options.fetchmode].ddfstart;
 	CopDDFSTOP[1]  = fetchinfo[options.fetchmode].ddfstop;
 
 	// plane pointers
 	wp = CopPLANE1H;
 
-	for (l = 0; l < BLOCKSDEPTH; l++) {
-		plane = (ULONG) ScreenBitmap->Planes[l];
+	for(l = 0;l < BLOCKSDEPTH;l++)
+	{
+		plane = (ULONG)ScreenBitmap->Planes[l];
 		wp[1] = plane >> 16;
 		wp[3] = plane & 0xFFFF;
+
 		wp += 4;
 	}
 
-	// Setup modulo trick
-	plane = (ULONG) ScreenBitmap->Planes[0];
+	// setup modulo trick
+	plane = (ULONG)ScreenBitmap->Planes[0];
 
-	plane2 = plane + (BITMAPHEIGHT - 1) * BITMAPBYTESPERROW * BLOCKSDEPTH +
-        SCREENBYTESPERROW + fetchinfo[options.fetchmode].modulooffset;
+	plane2 = plane +
+				(BITMAPHEIGHT - 1) * BITMAPBYTESPERROW * BLOCKSDEPTH +
+				SCREENBYTESPERROW +
+				fetchinfo[options.fetchmode].modulooffset;
 
 	l = (plane - plane2) & 0xFFFF;
 
 	CopVIDEOSPLITMODULO[1] = l;
 	CopVIDEOSPLITMODULO[3] = l;
+
 	CopVIDEOSPLITMODULO[1] = l;
 	CopVIDEOSPLITMODULO[3] = l;
 
@@ -273,6 +275,7 @@ static void DrawBlock(LONG x,LONG y,LONG mapx,LONG mapy)
 	// y = in "planelines" (1 realline = BLOCKSDEPTH planelines)
 	x = (x / 8) & 0xFFFE;
 	block = level_map.data[mapy * level_map.width + mapx];
+
 	mapx = (block % BLOCKSPERROW) * (BLOCKWIDTH / 8);
 	mapy = (block / BLOCKSPERROW) * (BLOCKPLANELINES * BLOCKSBYTESPERROW);
 
@@ -281,7 +284,6 @@ static void DrawBlock(LONG x,LONG y,LONG mapx,LONG mapy)
 	if (y + BLOCKPLANELINES <= BITMAPPLANELINES) {
 		// blit does not cross bitmap's bottom boundary
 		HardWaitBlit();
-
 		custom->bltcon0 = 0x9F0;	// use A and D. Op: D = A
 		custom->bltcon1 = 0;
 		custom->bltafwm = 0xFFFF;
@@ -313,6 +315,7 @@ static void DrawBlock(LONG x,LONG y,LONG mapx,LONG mapy)
 
 		custom->bltdpt  = frontbuffer + x;
 		custom->bltsize = (BLOCKPLANELINES - y)  * 64 + (BLOCKWIDTH / 16);
+
 	}
 
 	if (options.how) DisownBlitter();
@@ -322,13 +325,37 @@ static void FillScreen(void)
 {
 	WORD a,b,x,y;
 
-	for (b = 0; b < BITMAPBLOCKSPERCOL; b++) {
-		for (a = 0; a < BITMAPBLOCKSPERROW; a++) {
+	for (b = 0;b < BITMAPBLOCKSPERCOL;b++)
+	{
+		for (a = 0;a < BITMAPBLOCKSPERROW;a++)
+		{
 			x = a * BLOCKWIDTH;
 			y = b * BLOCKPLANELINES;
-			DrawBlock(x, y, a, b);
+
+			DrawBlock(x,y,a,b);
 		}
 	}
+}
+
+static void BlitExtraLine(WORD dest)
+{
+	UBYTE *a,*b;
+
+	a = frontbuffer;
+	b = frontbuffer + BITMAPPLANELINES * BITMAPBYTESPERROW;
+
+	HardWaitBlit();
+
+	custom->bltcon0 = 0x9F0;
+	custom->bltcon1 = 0;
+	custom->bltafwm = 0xFFFF;
+	custom->bltalwm = 0xFFFF;
+	custom->bltamod = 0;
+	custom->bltdmod = 0;
+	custom->bltapt  = (dest == UP) ? b : a;
+	custom->bltdpt  = (dest == UP) ? a : b;
+
+	custom->bltsize = 1 * BLOCKSDEPTH * 64 + (BITMAPBYTESPERROW / 2);
 }
 
 static void ScrollUp(void)
@@ -341,11 +368,11 @@ static void ScrollUp(void)
 	mapblocky = mapposy / BLOCKHEIGHT;
 	stepy = mapposy & (NUMSTEPS_Y - 1);
 
-	videoposy -= BLOCKSDEPTH;
-	if (videoposy < 0) videoposy += BITMAPPLANELINES;
+	videoposy--;
+	if (videoposy < 0) videoposy += BITMAPHEIGHT;
 	if (stepy == (NUMSTEPS_Y - 1)) {
-		block_videoposy -= BLOCKPLANELINES;
-		if (block_videoposy < 0) block_videoposy += BITMAPPLANELINES;
+		block_videoposy -= BLOCKHEIGHT;
+		if (block_videoposy < 0) block_videoposy += BITMAPHEIGHT;
 	}
 
 	if (stepy == (NUMSTEPS_Y - 1)) {
@@ -358,25 +385,31 @@ static void ScrollUp(void)
 		if (stepx) {
 			// step 1: blit the 1st block in the fillup
 			//         col (x). There can only be 0 or
-			//         (2 or more) fill up blocks in the
+			//         [2 or more] fill up blocks in the
 			//         actual implementation, so we do
 			//         not need to check previous_xdirection
 			//         for this blit
 			mapx = mapblockx + BITMAPBLOCKSPERROW;
 			mapy = mapblocky + 1;
+
 			x = ROUND2BLOCKWIDTH(videoposx);
-			y = (block_videoposy + 1 + BLOCKPLANELINES) % BITMAPPLANELINES;
-			DrawBlock(x,y,mapx,mapy);
+			y = (block_videoposy + BLOCKHEIGHT) % BITMAPHEIGHT;
+			y *= BLOCKSDEPTH;
+
+			DrawBlock(x + BITMAPWIDTH,y,mapx,mapy);
 
 			// step 2: remove the (former) bottommost fill up
 			// block
-			if (previous_xdirection == DIRECTION_RIGHT) {
+			if (previous_xdirection == DIRECTION_RIGHT)	{
 				*savewordpointer = saveword;
 			}
+
 			mapy = stepx + 2;
 
 			// we blit a 'left' block
-			y = (block_videoposy + (mapy * BLOCKPLANELINES)) % BITMAPPLANELINES;
+
+			y = (block_videoposy + (mapy * BLOCKHEIGHT)) % BITMAPHEIGHT;
+			y *= BLOCKSDEPTH;
 
 			savewordpointer = (WORD *)(frontbuffer + (y * BITMAPBYTESPERROW) + (x / 8));
 			saveword = *savewordpointer;
@@ -385,7 +418,9 @@ static void ScrollUp(void)
 			mapy += mapblocky;
 
 			DrawBlock(x,y,mapx,mapy);
+
 			previous_xdirection = DIRECTION_LEFT;
+
 		} /* if (stepx) */
 	} /* if (stepy == NUMSTEPS_Y - 1) */
 
@@ -393,65 +428,59 @@ static void ScrollUp(void)
 	mapx = stepy;
 	mapy = mapblocky;
 
-	y = block_videoposy;
+	y = block_videoposy * BLOCKSDEPTH;
 
     if (mapx >= TWOBLOCKSTEP) {
-
         // blit only one block
         mapx += TWOBLOCKSTEP;
         x = mapx * BLOCKWIDTH + ROUND2BLOCKWIDTH(videoposx);
-        ADJUSTDESTCOORDS(x,y);
         mapx += mapblockx;
         DrawBlock(x,y,mapx,mapy);
     } else {
         // blit two blocks
         mapx *= 2;
         x = mapx * BLOCKWIDTH + ROUND2BLOCKWIDTH(videoposx);
-        ADJUSTDESTCOORDS(x,y);
-        mapx += mapblockx;
+		mapx += mapblockx;
         DrawBlock(x,y,mapx,mapy);
         x += BLOCKWIDTH;
-        ADJUSTDESTCOORDS(x,y);
         DrawBlock(x,y,mapx + 1,mapy);
     }
 }
 
 static void ScrollDown(void)
 {
-	WORD mapx, mapy, x, y, y2;
+	WORD mapx,mapy,x,y,y2;
 
 	if (mapposy >= (level_map.height * BLOCKHEIGHT - SCREENHEIGHT - BLOCKHEIGHT)) return;
 	mapx = stepy;
 	mapy = mapblocky + BITMAPBLOCKSPERCOL;
-	y = block_videoposy;
+	y = block_videoposy * BLOCKSDEPTH;
 
     if (mapx >= TWOBLOCKSTEP) {
-
         // blit only one block
         mapx += TWOBLOCKSTEP;
         x = mapx * BLOCKWIDTH + ROUND2BLOCKWIDTH(videoposx);
-		ADJUSTDESTCOORDS(x,y);
         mapx += mapblockx;
         DrawBlock(x,y,mapx,mapy);
     } else {
         // blit two blocks
         mapx *= 2;
         x = mapx * BLOCKWIDTH + ROUND2BLOCKWIDTH(videoposx);
-		ADJUSTDESTCOORDS(x,y);
         mapx += mapblockx;
         DrawBlock(x,y,mapx,mapy);
         x += BLOCKWIDTH;
-		ADJUSTDESTCOORDS(x,y);
         DrawBlock(x,y,mapx + 1,mapy);
     }
-	mapposy++;
-	mapblocky = mapposy / BLOCKHEIGHT;
+    mapposy++;
+    mapblocky = mapposy / BLOCKHEIGHT;
 	stepy = mapposy & (NUMSTEPS_Y - 1);
-	videoposy += BLOCKSDEPTH;
-	if (videoposy >= BITMAPPLANELINES) videoposy -= BITMAPPLANELINES;
-	if (!stepy) {
-		block_videoposy += BLOCKPLANELINES;
-		if (block_videoposy >= BITMAPPLANELINES) block_videoposy -= BITMAPPLANELINES;
+
+	videoposy++;
+	if (videoposy >= BITMAPHEIGHT) videoposy -= BITMAPHEIGHT;
+
+	if (!stepy)	{
+		block_videoposy += BLOCKHEIGHT;
+		if (block_videoposy >= BITMAPHEIGHT) block_videoposy -= BITMAPHEIGHT;
 	}
 
 	if (stepy == 0) {
@@ -469,9 +498,8 @@ static void ScrollDown(void)
 			//         by the fillup row
 			mapx = mapblockx;
 			mapy = mapblocky;
-
 			x = ROUND2BLOCKWIDTH(videoposx);
-			y = block_videoposy;
+			y = block_videoposy * BLOCKSDEPTH;
 			DrawBlock(x,y,mapx,mapy);
 
 			// step 2: blit the (new) bottommost fill up
@@ -481,9 +509,12 @@ static void ScrollDown(void)
 			}
 			mapy = stepx + 1;
 
-			// we blit a 'right' block, therefore + 1
+			// we blit a 'right-block'
+			x += BITMAPWIDTH;
 
-			y = (block_videoposy + 1 + (mapy * BLOCKPLANELINES)) % BITMAPPLANELINES;
+			y = (block_videoposy + (mapy * BLOCKHEIGHT)) % BITMAPHEIGHT;
+			y *= BLOCKSDEPTH;
+
 			y2 = (y + BLOCKPLANELINES - 1) % BITMAPPLANELINES;
 
 			savewordpointer = (WORD *)(frontbuffer + (y2 * BITMAPBYTESPERROW) + (x / 8));
@@ -493,7 +524,6 @@ static void ScrollDown(void)
 			mapy += mapblocky;
 
 			DrawBlock(x,y,mapx,mapy);
-
 			previous_xdirection = DIRECTION_RIGHT;
 		} /* if (stepx) */
 	} /* if (stepy == 0) */
@@ -511,11 +541,15 @@ static void ScrollLeft(void)
 
 	videoposx--;
 	if (videoposx < 0) {
-		videoposx = BITMAPWIDTH - 1;
+		BlitExtraLine(DOWN);
+
+		videoposx = PLANEPIXELBITMAPWIDTH - 1;
+
 		videoposy--;
-		if (videoposy < 0) videoposy = BITMAPPLANELINES - 1;
+		if (videoposy < 0) videoposy = BITMAPHEIGHT - 1;
+
 		block_videoposy--;
-		if (block_videoposy < 0) block_videoposy = BITMAPPLANELINES - 1;
+		if (block_videoposy < 0) block_videoposy = BITMAPHEIGHT - 1;
 	}
 
 	if (stepx == (NUMSTEPS_X - 1)) {
@@ -529,6 +563,7 @@ static void ScrollLeft(void)
 		//         might not be a fill up block
 		mapx = mapblockx;
 		mapy = mapblocky;
+
 		if (stepy) {
 			// there is a fill up block
 			// so block which comes in left is
@@ -537,7 +572,7 @@ static void ScrollLeft(void)
 		}
 
 		x = ROUND2BLOCKWIDTH(videoposx);
-		y = block_videoposy;
+		y = block_videoposy * BLOCKSDEPTH;
 		DrawBlock(x,y,mapx,mapy);
 
 		// step 2: remove the (former) rightmost fillup-block
@@ -550,19 +585,19 @@ static void ScrollLeft(void)
 				mapx *= 2;
 			}
 			x = ROUND2BLOCKWIDTH(videoposx) + (mapx * BLOCKWIDTH);
-			y = block_videoposy;
-			ADJUSTDESTCOORDS(x,y);
+			y = block_videoposy * BLOCKSDEPTH;
 			mapx += mapblockx;
 			mapy -= BITMAPBLOCKSPERCOL;
 			DrawBlock(x,y,mapx,mapy);
 		}
 	}
+
 	mapx = mapblockx;
 	mapy = stepx + 1;
 
 	x = ROUND2BLOCKWIDTH(videoposx);
 
-	if (previous_xdirection == DIRECTION_RIGHT) {
+	if (previous_xdirection == DIRECTION_RIGHT)	{
 		HardWaitBlit();
 		*savewordpointer = saveword;
 	}
@@ -570,17 +605,24 @@ static void ScrollLeft(void)
 	if (mapy == 1) {
 		// blit two blocks
 		mapy += mapblocky;
-		y = (block_videoposy + (1 * BLOCKPLANELINES)) % BITMAPPLANELINES;
+		y = (block_videoposy + (1 * BLOCKHEIGHT)) % BITMAPHEIGHT;
+		y *= BLOCKSDEPTH;
+
 		savewordpointer = (WORD *)(frontbuffer + (y * BITMAPBYTESPERROW) + (x / 8));
 		saveword = *savewordpointer;
+
 		DrawBlock(x,y,mapx,mapy);
 
 		y = (y + BLOCKPLANELINES) % BITMAPPLANELINES;
+
 		DrawBlock(x,y,mapx,mapy + 1);
+
 	} else {
 		// blit one block
 		mapy ++;
-		y = (block_videoposy + (mapy * BLOCKPLANELINES)) % BITMAPPLANELINES;
+
+		y = (block_videoposy + (mapy * BLOCKHEIGHT)) % BITMAPHEIGHT;
+		y *= BLOCKSDEPTH;
 
 		mapy += mapblocky;
 
@@ -616,46 +658,49 @@ static void ScrollRight(void)
 	if (mapy == 1) {
 		// blit two blocks
 		mapy += mapblocky;
-		y = (block_videoposy + 1 + (1 * BLOCKPLANELINES)) % BITMAPPLANELINES;
 
-		DrawBlock(x,y,mapx,mapy);
+		y = (block_videoposy + (1 * BLOCKHEIGHT)) % BITMAPHEIGHT;
+		y *= BLOCKSDEPTH;
 
+		DrawBlock(x + BITMAPWIDTH,y,mapx,mapy);
 		y = (y + BLOCKPLANELINES) % BITMAPPLANELINES;
 		y2 = (y + BLOCKPLANELINES - 1) % BITMAPPLANELINES;
-
-		savewordpointer = (WORD *)(frontbuffer + (y2 * BITMAPBYTESPERROW) + (x / 8));
+		savewordpointer = (WORD *)(frontbuffer + (y2 * BITMAPBYTESPERROW) + ((x + BITMAPWIDTH) / 8));
 		saveword = *savewordpointer;
 
-		DrawBlock(x,y,mapx,mapy + 1);
+		DrawBlock(x + BITMAPWIDTH,y,mapx,mapy + 1);
 
 	} else {
 		// blit one block
-		mapy++;
-
-		y = (block_videoposy + 1 + (mapy * BLOCKPLANELINES)) % BITMAPPLANELINES;
+		mapy ++;
+		y = (block_videoposy + (mapy * BLOCKHEIGHT)) % BITMAPHEIGHT;
+		y *= BLOCKSDEPTH;
 		y2 = (y + BLOCKPLANELINES - 1) % BITMAPPLANELINES;
-
 		mapy += mapblocky;
-		savewordpointer = (WORD *)(frontbuffer + (y2 * BITMAPBYTESPERROW) + (x / 8));
+
+		savewordpointer = (WORD *)(frontbuffer + (y2 * BITMAPBYTESPERROW) + ((x + BITMAPWIDTH) / 8));
 		saveword = *savewordpointer;
-		DrawBlock(x,y,mapx,mapy);
+
+		DrawBlock(x + BITMAPWIDTH,y,mapx,mapy);
 	}
 	mapposx++;
 	mapblockx = mapposx / BLOCKWIDTH;
 	stepx = mapposx & (NUMSTEPS_X - 1);
 
 	videoposx++;
-	if (videoposx == BITMAPWIDTH) {
-		videoposx = 0;
 
+	if (videoposx == PLANEPIXELBITMAPWIDTH)	{
+		BlitExtraLine(UP);
+
+		videoposx = 0;
 		videoposy++;
-		if (videoposy == BITMAPPLANELINES) videoposy = 0;
+		if (videoposy == BITMAPHEIGHT) videoposy = 0;
 
 		block_videoposy++;
-		if (block_videoposy == BITMAPPLANELINES) block_videoposy = 0;
+		if (block_videoposy == BITMAPHEIGHT) block_videoposy = 0;
 	}
 
-	if (stepx == 0) {
+	if (stepx == 0)	{
 		// a complete column is filled up
 		// : the next fill up column will be BLOCKWIDTH (16)
 		// pixels at the right, so we have to adjust
@@ -664,13 +709,13 @@ static void ScrollRight(void)
 		// step 1: blit the block which came in at
 		//         the right side and which is never
 		//         a fill up block
+
 		mapx = mapblockx + BITMAPBLOCKSPERROW - 1;
 		mapy = mapblocky;
 
 		x = ROUND2BLOCKWIDTH(videoposx) + (BITMAPBLOCKSPERROW - 1) * BLOCKWIDTH;
-		y = block_videoposy;
+		y = block_videoposy * BLOCKSDEPTH;
 
-		ADJUSTDESTCOORDS(x,y);
 		DrawBlock(x,y,mapx,mapy);
 
 		// step 2: blit the (new) rightmost fillup-block
@@ -683,8 +728,7 @@ static void ScrollRight(void)
 				mapx = mapx * 2 - 1;
 			}
 			x = ROUND2BLOCKWIDTH(videoposx) + (mapx * BLOCKWIDTH);
-			y = block_videoposy;
-			ADJUSTDESTCOORDS(x,y);
+			y = block_videoposy * BLOCKSDEPTH;
 			mapx += mapblockx;
 			DrawBlock(x,y,mapx,mapy + BITMAPBLOCKSPERCOL);
 		}
@@ -701,8 +745,7 @@ static void CheckJoyScroll(void)
 {
 	WORD i,count;
 
-	if (JoyFire()) count = 4;
-    else count = 1;
+	if (JoyFire()) count = 4; else count = 1;
 
 	if (JoyUp()) {
 		for (i = 0; i < count; i++) {
@@ -711,45 +754,21 @@ static void CheckJoyScroll(void)
 	}
 
 	if (JoyDown()) {
-		for (i = 0; i < count; i++) {
+		for (i = 0; i < count; i++)	{
 			ScrollDown();
 		}
 	}
 
 	if (JoyLeft()) {
-		for (i = 0; i < count; i++) {
+		for (i = 0; i < count; i++)	{
 			ScrollLeft();
 		}
 	}
 
-	if (JoyRight()) {
-		for (i = 0; i < count; i++) {
+	if (JoyRight())	{
+		for (i = 0; i < count; i++)	{
 			ScrollRight();
 		}
-	}
-}
-
-static void BlitVideoSplitLine(void)
-{
-	WORD x, y, bytes;
-
-	y = videoposy % BLOCKSDEPTH;
-	x = videoposx;
-	bytes = y * BITMAPBYTESPERROW + (x / 8);
-
-	if (bytes >= 2) {
-		HardWaitBlit();
-
-		custom->bltcon0 = 0x9F0;
-		custom->bltcon1 = 0;
-		custom->bltafwm = 0xFFFF;
-		custom->bltalwm = 0xFFFF;
-		custom->bltamod = 0;
-		custom->bltdmod = 0;
-		custom->bltapt  = frontbuffer;
-		custom->bltdpt  = frontbuffer + BITMAPPLANELINES * BITMAPBYTESPERROW;
-
-		custom->bltsize = (bytes / 2) * 64 + 1;
 	}
 }
 
@@ -775,27 +794,29 @@ static void UpdateCopperlist(void)
 	CopBPLCON1[1] = scroll;
 
 	// set top plane pointers
-	// yoffset is in planelines!!! not reallines!
-	yoffset = (videoposy + BLOCKHEIGHT * BLOCKSDEPTH) % BITMAPPLANELINES;
-	planeadd = ((LONG)yoffset) * BITMAPBYTESPERROW;
+	yoffset = (videoposy + BLOCKHEIGHT) % BITMAPHEIGHT;
+	planeadd = ((LONG)yoffset) * BLOCKSDEPTH * BITMAPBYTESPERROW;
+
 	wp = CopPLANE1H;
 
 	for (i = 0; i < BLOCKSDEPTH; i++) {
 		pl = ((ULONG)ScreenBitmap->Planes[i]) + planeadd + planeaddx;
+
 		wp[1] = (WORD)(pl >> 16);
 		wp[3] = (WORD)(pl & 0xFFFF);
+
 		wp += 4;
 	}
 
 	// set video split wait
-	yoffset = yoffset / BLOCKSDEPTH;	// convert planelines to splitlines
+
 	yoffset = BITMAPHEIGHT - yoffset;
 	yoffset += (DIWSTART >> 8);
 
 	/* CopVIDEOSPLIT must wait for line (yoffset -1 )
 	   CopVIDEOSPLIT2 must wait for line (yoffset)    */
 
-	if (yoffset <= 255) {
+	if (yoffset <= 255)	{
 		CopVIDEOSPLIT[0] = 0x0001;
 		CopVIDEOSPLIT[2] = (yoffset - 1) * 256 + 0x1;
 
@@ -821,9 +842,8 @@ static void UpdateCopperlist(void)
  		correct thanks to the modulo-trick in the copperlist
  		which is setup in UpdateCopperlist().
 	*/
-	pl = (ULONG)ScreenBitmap->Planes[0] + planeaddx + (videoposy % BLOCKSDEPTH) * BITMAPBYTESPERROW;
+	pl = (ULONG)ScreenBitmap->Planes[0] + planeaddx;
 
-	// set high words
 	wp = CopPLANE2_1H;
 
 	for (i = 0; i < BLOCKSDEPTH; i++) {
@@ -839,6 +859,7 @@ static void MainLoop(void)
 		// activate copperlist
 		HardWaitBlit();
 		WaitVBL();
+
 		custom->copjmp2 = 0;
 	}
 
@@ -852,17 +873,14 @@ static void MainLoop(void)
 		}
 
 		if (options.speed) *(WORD *)0xdff180 = 0xFF0;
-
 		CheckJoyScroll();
-		BlitVideoSplitLine();
-
 		if (options.speed) *(WORD *)0xdff180 = 0xF00;
 	}
 }
 
 /********************* MAIN *************************/
 
-int main(int argc, char **argv)
+int main(int argc, char *argv)
 {
 	BOOL res = get_arguments(&options, s);
     if (!res) Cleanup(s);
@@ -882,11 +900,9 @@ int main(int argc, char **argv)
 	}
 	FillScreen();
 	MainLoop();
-
 	if (!options.how) {
 		ActivateSystem();
 	}
 	Cleanup(0);
     return 0;
 }
-
