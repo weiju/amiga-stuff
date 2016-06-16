@@ -38,7 +38,7 @@ struct LevelMap {
 
 extern ULONG get_mode_id(BOOL option_how, BOOL option_ntsc);
 extern BOOL get_arguments(struct PrgOptions *options, char *s);
-extern BOOL read_level_map(struct LevelMap *level_map, char *s);
-extern struct BitMap *read_blocks(UWORD *colors, char *s);
+extern BOOL read_level_map(const char * path, struct LevelMap *level_map, char *s);
+extern struct BitMap *read_blocks(UWORD *colors, char *s, int blocks_width, int blocks_height);
 
 #endif /* __COMMON_H__ */

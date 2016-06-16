@@ -10,7 +10,6 @@
 #define ARG_FMODE 4
 #define NUM_ARGS  5
 
-#define MAPNAME		"maps/large.raw"
 #define BLOCKSNAME	"blocks/demoblocks.raw"
 
 #define SCREENWIDTH  320
@@ -22,8 +21,6 @@
 
 #define BLOCKWIDTH 16
 #define BLOCKHEIGHT 16
-#define BLOCKSBYTESPERROW (BLOCKSWIDTH / 8)
-#define BLOCKSPERROW (BLOCKSWIDTH / BLOCKWIDTH)
 
 #define NUMSTEPS BLOCKWIDTH
 

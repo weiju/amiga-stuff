@@ -19,6 +19,7 @@
 #include "global_defs.h"
 #include "common.h"
 
+#define MAPNAME		"maps/large.raw"
 #define EXTRAWIDTH 32
 
 #define BITMAPWIDTH ((SCREENWIDTH + EXTRAWIDTH) * 2)
@@ -29,6 +30,8 @@
 
 #define BLOCKSWIDTH 320
 #define BLOCKSHEIGHT 256
+#define BLOCKSBYTESPERROW (BLOCKSWIDTH / 8)
+#define BLOCKSPERROW (BLOCKSWIDTH / BLOCKWIDTH)
 
 #define BITMAPBLOCKSPERROW (BITMAPWIDTH / BLOCKWIDTH)
 #define HALFBITMAPBLOCKSPERROW (BITMAPBLOCKSPERROW / 2)
@@ -354,10 +357,10 @@ int main(int argc, char **argv)
 {
 	BOOL res = get_arguments(&options, s);
     if (!res) Cleanup(s);
-	res = read_level_map(&level_map, s);
+	res = read_level_map(MAPNAME, &level_map, s);
     if (!res) Cleanup(s);
 
-	BlocksBitmap = read_blocks(colors, s);
+	BlocksBitmap = read_blocks(colors, s, BLOCKSWIDTH, BLOCKSHEIGHT);
     if (!BlocksBitmap) Cleanup(s);
 	blocksbuffer = BlocksBitmap->Planes[0];
 

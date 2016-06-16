@@ -19,6 +19,7 @@
 #include "global_defs.h"
 #include "common.h"
 
+#define MAPNAME		"maps/Scroller.raw"
 #define EXTRAWIDTH  64
 #define EXTRAHEIGHT 32
 
@@ -28,6 +29,8 @@
 
 #define BLOCKSWIDTH 320
 #define BLOCKSHEIGHT 200
+#define BLOCKSBYTESPERROW (BLOCKSWIDTH / 8)
+#define BLOCKSPERROW (BLOCKSWIDTH / BLOCKWIDTH)
 
 #define NUMSTEPS_X BLOCKWIDTH
 #define NUMSTEPS_Y BLOCKHEIGHT
@@ -780,10 +783,10 @@ int main(int argc, char **argv)
 {
 	BOOL res = get_arguments(&options, s);
     if (!res) Cleanup(s);
-	res = read_level_map(&level_map, s);
+	res = read_level_map(MAPNAME, &level_map, s);
     if (!res) Cleanup(s);
 
-	BlocksBitmap = read_blocks(colors, s);
+	BlocksBitmap = read_blocks(colors, s, BLOCKSWIDTH, BLOCKSHEIGHT);
     if (!BlocksBitmap) Cleanup(s);
 	blocksbuffer = BlocksBitmap->Planes[0];
 

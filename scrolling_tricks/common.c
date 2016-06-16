@@ -70,13 +70,13 @@ BOOL get_arguments(struct PrgOptions *options, char *s)
     return TRUE;
 }
 
-BOOL read_level_map(struct LevelMap *level_map, char *s)
+BOOL read_level_map(const char *path, struct LevelMap *level_map, char *s)
 {
 	LONG l;
     BPTR fhandle;
     struct RawMap *raw_map;
 
-	if (!(fhandle = Open(MAPNAME, MODE_OLDFILE)))
+	if (!(fhandle = Open(path, MODE_OLDFILE)))
 	{
 		Fault(IoErr(), 0, s, 255);
 		return FALSE;
@@ -105,14 +105,14 @@ BOOL read_level_map(struct LevelMap *level_map, char *s)
     return TRUE;
 }
 
-struct BitMap *read_blocks(UWORD *colors, char *s)
+struct BitMap *read_blocks(UWORD *colors, char *s, int blocks_width, int blocks_height)
 {
 	LONG l;
     struct BitMap *bitmap;
     BPTR fhandle;
 
-	if (!(bitmap = AllocBitMap(BLOCKSWIDTH,
-                               BLOCKSHEIGHT,
+	if (!(bitmap = AllocBitMap(blocks_width,
+                               blocks_height,
                                BLOCKSDEPTH,
                                BMF_STANDARD | BMF_INTERLEAVED,
                                0))) {
@@ -120,7 +120,7 @@ struct BitMap *read_blocks(UWORD *colors, char *s)
         return NULL;
 	}
 
-	if (!(fhandle = Open(BLOCKSNAME,MODE_OLDFILE))) {
+	if (!(fhandle = Open(BLOCKSNAME, MODE_OLDFILE))) {
 		Fault(IoErr(), 0, s, 255);
         FreeBitMap(bitmap);
 		return NULL;
@@ -133,7 +133,7 @@ struct BitMap *read_blocks(UWORD *colors, char *s)
         return NULL;
 	}
 
-	l = BLOCKSWIDTH * BLOCKSHEIGHT * BLOCKSDEPTH / 8;
+	l = blocks_width * blocks_height * BLOCKSDEPTH / 8;
 
 	if (Read(fhandle, bitmap->Planes[0], l) != l) {
 		Fault(IoErr(), 0, s, 255);
