@@ -19,7 +19,6 @@
 #include "global_defs.h"
 #include "common.h"
 
-#define MAPNAME		"maps/scroller.raw"
 #define EXTRAWIDTH  64
 #define EXTRAHEIGHT 32
 
@@ -63,8 +62,8 @@
 
 struct Screen *scr;
 struct RastPort *ScreenRastPort;
-struct BitMap *BlocksBitmap,*ScreenBitmap;
-UBYTE	 *frontbuffer,*blocksbuffer;
+struct BitMap *BlocksBitmap, *ScreenBitmap;
+UBYTE	 *frontbuffer, *blocksbuffer;
 
 WORD	mapposx,mapposy,videoposx,videoposy,block_videoposy;
 WORD	mapblockx,mapblocky,stepx,stepy;
@@ -866,10 +865,10 @@ int main(int argc, char **argv)
 {
 	BOOL res = get_arguments(&options, s);
     if (!res) Cleanup(s);
-	res = read_level_map(MAPNAME, &level_map, s);
+	res = read_level_map(SCROLLER_MAP_PATH, &level_map, s);
     if (!res) Cleanup(s);
 
-	BlocksBitmap = read_blocks(colors, s, BLOCKSWIDTH, BLOCKSHEIGHT);
+	BlocksBitmap = read_blocks(DEMO_BLOCKS_PATH, colors, s, BLOCKSWIDTH, BLOCKSHEIGHT);
     if (!BlocksBitmap) Cleanup(s);
 	blocksbuffer = BlocksBitmap->Planes[0];
 

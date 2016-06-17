@@ -1,7 +1,7 @@
 ASM=vasmm68k_mot
 ASM_FLAGS = -Fhunk -devpac
 .SUFFIXES = .o .asm .c
-PROGRAMS=xunlimited xlimited xylimited xyunlimited xyunlimited2
+PROGRAMS=xunlimited xlimited xylimited xyunlimited xyunlimited2 yunlimited yunlimited2
 
 CC=vc +aos68k
 CFLAGS=-c99 -I$(NDK_INC) -DDEBUG
@@ -20,7 +20,6 @@ clean:
 xunlimited: hardware.o cop_x.o common.o xunlimited.o
 	$(CC) -o $@ $^ -lamiga -lauto
 
-
 xlimited: hardware.o cop_x.o common.o xlimited.o
 	$(CC) -o $@ $^ -lamiga -lauto
 
@@ -31,4 +30,10 @@ xyunlimited: hardware.o cop_xy.o common.o xyunlimited.o
 	$(CC) -o $@ $^ -lamiga -lauto
 
 xyunlimited2: hardware.o cop_xy.o common.o xyunlimited2.o
+	$(CC) -o $@ $^ -lamiga -lauto
+
+yunlimited: hardware.o cop_y.o common.o yunlimited.o
+	$(CC) -o $@ $^ -lamiga -lauto
+
+yunlimited2: hardware.o cop_y2.o common.o yunlimited2.o
 	$(CC) -o $@ $^ -lamiga -lauto

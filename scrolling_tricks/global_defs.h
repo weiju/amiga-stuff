@@ -10,7 +10,11 @@
 #define ARG_FMODE 4
 #define NUM_ARGS  5
 
-#define BLOCKSNAME	"blocks/demoblocks.raw"
+#define DEMO_BLOCKS_PATH	"blocks/demoblocks.raw"
+#define LARGE_MAP_PATH      "maps/large.raw"
+#define SCROLLER_MAP_PATH   "maps/scroller.raw"
+#define RACE_BLOCKS_PATH	"blocks/raceblocks.raw"
+#define RACE_MAP_PATH       "maps/race.raw"
 
 #define SCREENWIDTH  320
 #define SCREENHEIGHT 256

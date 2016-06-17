@@ -105,7 +105,7 @@ BOOL read_level_map(const char *path, struct LevelMap *level_map, char *s)
     return TRUE;
 }
 
-struct BitMap *read_blocks(UWORD *colors, char *s, int blocks_width, int blocks_height)
+struct BitMap *read_blocks(const char *path, UWORD *colors, char *s, int blocks_width, int blocks_height)
 {
 	LONG l;
     struct BitMap *bitmap;
@@ -120,7 +120,7 @@ struct BitMap *read_blocks(UWORD *colors, char *s, int blocks_width, int blocks_
         return NULL;
 	}
 
-	if (!(fhandle = Open(BLOCKSNAME, MODE_OLDFILE))) {
+	if (!(fhandle = Open(path, MODE_OLDFILE))) {
 		Fault(IoErr(), 0, s, 255);
         FreeBitMap(bitmap);
 		return NULL;
