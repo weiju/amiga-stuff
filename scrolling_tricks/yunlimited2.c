@@ -15,7 +15,7 @@
 #include <stdlib.h>
 
 #include "hardware.h"
-#include "cop_y2.h"
+#include "cop_all.h"
 #include "global_defs.h"
 #include "common.h"
 

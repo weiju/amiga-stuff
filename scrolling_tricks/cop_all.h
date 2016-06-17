@@ -26,6 +26,10 @@ extern WORD CopPLANE7L[];
 extern WORD CopPLANE8H[];
 extern WORD CopPLANE8L[];
 
+/* not used in vertical-only scrolling levels */
+extern WORD CopSKY[];
+
+/* used by y2 and xy */
 extern WORD CopVIDEOSPLIT[];
 extern WORD CopVIDEOSPLITMODULO[];
 extern WORD CopVIDEOSPLIT2[];
@@ -40,5 +44,3 @@ extern WORD CopPLANE2_7H[];
 extern WORD CopPLANE2_8H[];
 
 extern WORD CopVIDEOSPLITRESETMODULO[];
-
-
