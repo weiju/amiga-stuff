@@ -31,13 +31,13 @@ static struct Process *thisprocess;
 extern struct IntuitionBase *IntuitionBase;
 extern struct GfxBase *GfxBase;
 
-static LONG NullInputHandler(void)
+static LONG null_input_handler(void)
 {
 	// kills all input
 	return 0;
 }
 
-void KillSystem(void)
+void kill_system(void)
 {
 	thisprocess = (struct Process *)FindTask(0);
 
@@ -48,7 +48,7 @@ void KillSystem(void)
 	WaitTOF();
 	WaitTOF();
 
-	// install NullInputHandler to kill all input events
+	// install null_input_handler() to kill all input events
 	if ((inputmp = CreateMsgPort())) {
 		if ((inputreq = CreateIORequest(inputmp,sizeof(*inputreq)))) {
 			if (OpenDevice("input.device",0,(struct IORequest *)inputreq,0) == 0) {
@@ -56,7 +56,7 @@ void KillSystem(void)
 				inputhandler.is_Node.ln_Type = NT_INTERRUPT;
 				inputhandler.is_Node.ln_Pri = 127;
 				inputhandler.is_Data = 0;
-				inputhandler.is_Code = (APTR)NullInputHandler;
+				inputhandler.is_Code = (APTR) null_input_handler;
 				inputreq->io_Command = IND_ADDHANDLER;
 				inputreq->io_Data = &inputhandler;
 				DoIO((struct IORequest *)inputreq);
@@ -82,7 +82,7 @@ void KillSystem(void)
 	old_intreq = custom->intreqr | 0x8000;
 }
 
-void ActivateSystem(void)
+void activate_system(void)
 {
 	// reset important custom registers
 	custom->dmacon = 0x7FFF;
@@ -123,7 +123,7 @@ void ActivateSystem(void)
 	WaitTOF();
 }
 
-void WaitVBL(void)
+void wait_vbl(void)
 {
 	UBYTE b;
 
@@ -131,7 +131,7 @@ void WaitVBL(void)
 	while(*(UBYTE *)0xbfe801 == b) ;
 }
 
-void WaitVBeam(ULONG line)
+void wait_vbeam(ULONG line)
 {
 	ULONG vpos;
 
@@ -142,32 +142,38 @@ void WaitVBeam(ULONG line)
 	} while ((vpos & 0x1FF00) != line);
 }
 
-void HardWaitBlit(void)
+void hard_wait_blit(void)
 {
 	if (custom->dmaconr & DMAF_BLTDONE) ;
 	while (custom->dmaconr & DMAF_BLTDONE) ;
 }
 
-void HardWaitLMB(void)
-{
-	while (((*(UBYTE *)0xbfe001) & 64) != 0) ;
-	while (((*(UBYTE *)0xbfe001) & 64) == 0) ;
-}
+BOOL joy_left(void) { return (custom->joy1dat & 512) ? TRUE : FALSE; }
+BOOL joy_right(void) { return (custom->joy1dat & 2) ? TRUE : FALSE; }
 
-BOOL JoyLeft(void) { return (custom->joy1dat & 512) ? TRUE : FALSE; }
-BOOL JoyRight(void) { return (custom->joy1dat & 2) ? TRUE : FALSE; }
-BOOL JoyFire(void) { return ((*(UBYTE *)0xbfe001) & 128) ? FALSE : TRUE; }
-BOOL LMBDown(void) { return ((*(UBYTE *)0xbfe001) & 64) ? FALSE : TRUE; }
-BOOL JoyUp(void)
+BOOL joy_up(void)
 {
 	// ^ = xor
 	WORD w = custom->joy1dat << 1;
 	return ((w ^ custom->joy1dat) & 512) ? TRUE : FALSE;
 }
 
-BOOL JoyDown(void)
+BOOL joy_down(void)
 {
 	// ^ = xor
 	WORD w = custom->joy1dat << 1;
 	return ((w ^ custom->joy1dat) & 2) ? TRUE : FALSE;
 }
+
+BOOL joy_fire(void) { return ((*(UBYTE *)0xbfe001) & 128) ? FALSE : TRUE; }
+BOOL lmb_down(void) { return ((*(UBYTE *)0xbfe001) & 64) ? FALSE : TRUE; }
+
+// This is not used, but keeping it as a reference, since waiting for mouse button is
+// tricky in C vs assembly
+/*
+void hard_wait_lmb(void)
+{
+	while (((*(UBYTE *)0xbfe001) & 64) != 0) ;
+	while (((*(UBYTE *)0xbfe001) & 64) == 0) ;
+}
+*/

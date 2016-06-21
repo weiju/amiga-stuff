@@ -41,23 +41,20 @@
 #define DIRECTION_RIGHT 0
 #define DIRECTION_LEFT  1
 
-struct Screen *scr;
-struct RastPort *ScreenRastPort;
-struct BitMap *BlocksBitmap, *ScreenBitmap;
-UBYTE	 *frontbuffer, *blocksbuffer;
-
-WORD	mapposx,videoposx;
-WORD	bitmapheight;
-BYTE	previous_direction;
-WORD	*savewordpointer;
-WORD	saveword;
-
-struct LevelMap level_map;
-
-UWORD	colors[BLOCKSCOLORS];
-
+struct Screen     *scr;
+struct RastPort   *ScreenRastPort;
+struct BitMap     *BlocksBitmap, *ScreenBitmap;
+struct LevelMap   level_map;
 struct PrgOptions options;
-char	s[256];
+
+UBYTE *frontbuffer, *blocksbuffer;
+WORD  mapposx, videoposx;
+WORD  bitmapheight;
+BYTE  previous_direction;
+WORD  *savewordpointer;
+WORD  saveword;
+UWORD colors[BLOCKSCOLORS];
+char  s[256];
 
 #if EXTRAWIDTH == 32
 
@@ -86,9 +83,7 @@ struct FetchInfo fetchinfo [] =
 	{0x18,0xB8,8,48,64}	/* BPL32 + BPAGEM */
 };
 
-/************* SETUP/CLEANUP ROUTINES ***************/
-
-static void Cleanup (char *msg)
+static void cleanup (char *msg)
 {
 	WORD rc;
 
@@ -115,77 +110,68 @@ static void Cleanup (char *msg)
 	exit(rc);
 }
 
-static void OpenDisplay(void)
+static void open_display(void)
 {
-	ULONG						modeid;
+	ULONG modeid;
 
-	bitmapheight = BITMAPHEIGHT +
-						(level_map.width / BITMAPBLOCKSPERROW / BLOCKSDEPTH) + 1 +
-						3;
+	bitmapheight = BITMAPHEIGHT + (level_map.width / BITMAPBLOCKSPERROW / BLOCKSDEPTH) + 1 + 3;
 
-	if (!(ScreenBitmap = AllocBitMap(BITMAPWIDTH,bitmapheight,BLOCKSDEPTH,BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR,0)))
-	{
-		Cleanup("Can't alloc screen bitmap!");
+	if (!(ScreenBitmap = AllocBitMap(BITMAPWIDTH, bitmapheight, BLOCKSDEPTH,
+                                     BMF_STANDARD | BMF_INTERLEAVED | BMF_CLEAR, 0))) {
+		cleanup("Can't alloc screen bitmap!");
 	}
 
 	frontbuffer = ScreenBitmap->Planes[0];
 	frontbuffer += (fetchinfo[options.fetchmode].bitmapoffset / 8);
 
-	if (!(TypeOfMem(ScreenBitmap->Planes[0]) & MEMF_CHIP))
-	{
-		Cleanup("Screen bitmap is not in CHIP RAM!?? If you have a gfx card try disabling \"planes to fast\" or similiar options in your RTG system!");
+	if (!(TypeOfMem(ScreenBitmap->Planes[0]) & MEMF_CHIP)) {
+		cleanup("Screen bitmap is not in CHIP RAM!?? If you have a gfx card try disabling \"planes to fast\" or similiar options in your RTG system!");
 	}
 
 	if (!IS_BITMAP_INTERLEAVED(ScreenBitmap)) {
-		Cleanup("Screen bitmap is not in interleaved format!??");
+		cleanup("Screen bitmap is not in interleaved format!??");
 	}
 
     modeid = get_mode_id(options.how, options.ntsc);
-	if (!(scr = OpenScreenTags(0,SA_Width,BITMAPWIDTH,
-										  SA_Height,bitmapheight,
-										  SA_Depth,BLOCKSDEPTH,
-										  SA_DisplayID,modeid,
-										  SA_BitMap,ScreenBitmap,
-										  options.how ? SA_Overscan : TAG_IGNORE,OSCAN_TEXT,
-										  options.how ? SA_AutoScroll : TAG_IGNORE,TRUE,
-										  SA_Quiet,TRUE,
-										  TAG_DONE))) {
-		Cleanup("Can't open screen!");
+	if (!(scr = OpenScreenTags(0, SA_Width, BITMAPWIDTH,
+                               SA_Height, bitmapheight,
+                               SA_Depth, BLOCKSDEPTH,
+                               SA_DisplayID, modeid,
+                               SA_BitMap, ScreenBitmap,
+                               options.how ? SA_Overscan : TAG_IGNORE, OSCAN_TEXT,
+                               options.how ? SA_AutoScroll : TAG_IGNORE, TRUE,
+                               SA_Quiet, TRUE,
+                               TAG_DONE))) {
+		cleanup("Can't open screen!");
 	}
 
 	if (scr->RastPort.BitMap->Planes[0] != ScreenBitmap->Planes[0]) {
-		Cleanup("Screen was not created with the custom bitmap I supplied!??");
+		cleanup("Screen was not created with the custom bitmap I supplied!??");
 	}
-
 	ScreenRastPort = &scr->RastPort;
-	LoadRGB4(&scr->ViewPort,colors,BLOCKSCOLORS);
+	LoadRGB4(&scr->ViewPort, colors, BLOCKSCOLORS);
 }
 
-static void InitCopperlist(void)
+static void init_copper_list(void)
 {
 	WORD	*wp;
 	LONG l;
 
-	WaitVBL();
-
+	wait_vbl();
 	custom->dmacon = 0x7FFF;
 	custom->beamcon0 = options.ntsc ? 0 : DISPLAYPAL;
 
 	CopFETCHMODE[1] = options.fetchmode;
 
 	// bitplane control registers
-	CopBPLCON0[1] = ((BLOCKSDEPTH * BPL0_BPU0_F) & BPL0_BPUMASK) +
-        ((BLOCKSDEPTH / 8) * BPL0_BPU3_F) +
-        BPL0_COLOR_F +
-        (options.speed ? 0 : BPL0_USEBPLCON3_F);
+	CopBPLCON0[1] = ((BLOCKSDEPTH * BPL0_BPU0_F) & BPL0_BPUMASK) + ((BLOCKSDEPTH / 8) * BPL0_BPU3_F) +
+        BPL0_COLOR_F + (options.speed ? 0 : BPL0_USEBPLCON3_F);
 
 	CopBPLCON1[1] = 0;
-
 	CopBPLCON3[1] = BPLCON3_BRDNBLNK;
 
 	// bitplane modulos
-	l = BITMAPBYTESPERROW * BLOCKSDEPTH -
-		 SCREENBYTESPERROW - fetchinfo[options.fetchmode].modulooffset;
+	l = BITMAPBYTESPERROW * BLOCKSDEPTH - SCREENBYTESPERROW - fetchinfo[options.fetchmode].modulooffset;
 
 	CopBPLMODA[1] = l;
 	CopBPLMODB[1] = l;
@@ -202,8 +188,8 @@ static void InitCopperlist(void)
 	wp = CopPLANE1H;
 
 	for (l = 0; l < BLOCKSDEPTH; l++) {
-		wp[1] = (WORD)(((ULONG)ScreenBitmap->Planes[l]) >> 16);
-		wp[3] = (WORD)(((ULONG)ScreenBitmap->Planes[l]) & 0xFFFF);
+		wp[1] = (WORD) (((ULONG)ScreenBitmap->Planes[l]) >> 16);
+		wp[3] = (WORD) (((ULONG)ScreenBitmap->Planes[l]) & 0xFFFF);
 		wp += 4;
 	}
 
@@ -213,12 +199,10 @@ static void InitCopperlist(void)
 	}
 	custom->intena = 0x7FFF;
 	custom->dmacon = DMAF_SETCLR | DMAF_BLITTER | DMAF_COPPER | DMAF_RASTER | DMAF_MASTER;
-	custom->cop2lc = (ULONG)CopperList;
+	custom->cop2lc = (ULONG) CopperList;
 }
 
-/******************* SCROLLING **********************/
-
-static void DrawBlock(LONG x, LONG y, LONG mapx, LONG mapy)
+static void draw_block(LONG x, LONG y, LONG mapx, LONG mapy)
 {
 	UBYTE block;
 
@@ -228,13 +212,12 @@ static void DrawBlock(LONG x, LONG y, LONG mapx, LONG mapy)
 	y = y * BITMAPBYTESPERROW;
 
 	block = level_map.data[mapy * level_map.width + mapx];
-
 	mapx = (block % BLOCKSPERROW) * (BLOCKWIDTH / 8);
 	mapy = (block / BLOCKSPERROW) * (BLOCKPLANELINES * BLOCKSBYTESPERROW);
 
 	if (options.how) OwnBlitter();
 
-	HardWaitBlit();
+	hard_wait_blit();
 
 	custom->bltcon0 = 0x9F0;	// use A and D. Op: D = A
 	custom->bltcon1 = 0;
@@ -243,13 +226,13 @@ static void DrawBlock(LONG x, LONG y, LONG mapx, LONG mapy)
 	custom->bltamod = BLOCKSBYTESPERROW - (BLOCKWIDTH / 8);
 	custom->bltdmod = BITMAPBYTESPERROW - (BLOCKWIDTH / 8);
 	custom->bltapt  = blocksbuffer + mapy + mapx;
-	custom->bltdpt	 = frontbuffer + y + x;
+	custom->bltdpt	= frontbuffer + y + x;
 	custom->bltsize = BLOCKPLANELINES * 64 + (BLOCKWIDTH / 16);
 
 	if (options.how) DisownBlitter();
 }
 
-static void FillScreen(void)
+static void fill_screen(void)
 {
 	WORD a, b, x, y;
 
@@ -257,12 +240,12 @@ static void FillScreen(void)
 		for (a = 0; a < BITMAPBLOCKSPERROW; a++) {
 			x = a * BLOCKWIDTH;
 			y = b * BLOCKPLANELINES;
-			DrawBlock(x, y, a, b);
+			draw_block(x, y, a, b);
 		}
 	}
 }
 
-static void ScrollLeft(void)
+static void scroll_left(void)
 {
 	WORD mapx,mapy,x,y;
 
@@ -278,17 +261,17 @@ static void ScrollLeft(void)
 	y = mapy * BLOCKPLANELINES;
 
 	if (previous_direction == DIRECTION_RIGHT) {
-		HardWaitBlit();
+		hard_wait_blit();
 		*savewordpointer = saveword;
 	}
 	savewordpointer = (WORD *)(frontbuffer + y * BITMAPBYTESPERROW + (x / 8));
 	saveword = *savewordpointer;
 
-	DrawBlock(x,y,mapx,mapy);
+	draw_block(x,y,mapx,mapy);
 	previous_direction = DIRECTION_LEFT;
 }
 
-static void ScrollRight(void)
+static void scroll_right(void)
 {
 	WORD mapx,mapy,x,y;
 
@@ -301,40 +284,27 @@ static void ScrollRight(void)
 	y = mapy * BLOCKPLANELINES;
 
 	if (previous_direction == DIRECTION_LEFT) {
-		HardWaitBlit();
+		hard_wait_blit();
 		*savewordpointer = saveword;
 	}
 	savewordpointer = (WORD *)(frontbuffer + (y + BLOCKPLANELINES - 1) * BITMAPBYTESPERROW + (x / 8));
 	saveword = *savewordpointer;
 
-	DrawBlock(x,y,mapx,mapy);
+	draw_block(x, y, mapx, mapy);
 
 	mapposx++;
 	videoposx = mapposx;
 	previous_direction = DIRECTION_RIGHT;
 }
 
-static void CheckJoyScroll(void)
+static void check_joy_scroll(void)
 {
-	WORD i,count;
-
-	if (JoyFire()) count = 8;
-    else count = 1;
-
-	if (JoyLeft()) {
-		for (i = 0; i < count; i++) {
-			ScrollLeft();
-		}
-	}
-
-	if (JoyRight()) {
-		for (i = 0;i < count;i++) {
-			ScrollRight();
-		}
-	}
+	WORD count = joy_fire() ?  8 : 1;
+	if (joy_left())  for (int i = 0; i < count; i++) scroll_left();
+	if (joy_right()) for (int i = 0; i < count; i++) scroll_right();
 }
 
-static void UpdateCopperlist(void)
+static void update_copper_list(void)
 {
 	ULONG pl;
 	WORD xpos, planeaddx, scroll, i;
@@ -359,81 +329,79 @@ static void UpdateCopperlist(void)
 
 	for (i = 0; i < BLOCKSDEPTH; i++) {
 		pl = ((ULONG)ScreenBitmap->Planes[i]) + planeaddx;
-		wp[1] = (WORD)(pl >> 16);
-		wp[3] = (WORD)(pl & 0xFFFF);
+		wp[1] = (WORD) (pl >> 16);
+		wp[3] = (WORD) (pl & 0xFFFF);
 		wp += 4;
 	}
 }
 
-static void ShowWhatCopperWouldDo(void)
+static void show_what_copper_would_do(void)
 {
 	WORD x = (videoposx+16) % BITMAPWIDTH;
 
-	SetWriteMask(ScreenRastPort,1);
-	SetAPen(ScreenRastPort,0);
-	RectFill(ScreenRastPort,0,bitmapheight - 3,BITMAPWIDTH-1,bitmapheight - 3);
+	SetWriteMask(ScreenRastPort, 1);
+	SetAPen(ScreenRastPort, 0);
+	RectFill(ScreenRastPort, 0, bitmapheight - 3, BITMAPWIDTH - 1, bitmapheight - 3);
 	SetAPen(ScreenRastPort,1);
 
 	if (x <= EXTRAWIDTH) {
-		RectFill(ScreenRastPort,x,bitmapheight - 3,x+SCREENWIDTH-1,bitmapheight - 3);
+		RectFill(ScreenRastPort, x, bitmapheight - 3, x + SCREENWIDTH - 1, bitmapheight - 3);
 	} else {
-		RectFill(ScreenRastPort,x,bitmapheight - 3,BITMAPWIDTH-1,bitmapheight - 3);
-		RectFill(ScreenRastPort,0,bitmapheight - 3,x - EXTRAWIDTH,bitmapheight - 3);
+		RectFill(ScreenRastPort, x, bitmapheight - 3, BITMAPWIDTH - 1, bitmapheight - 3);
+		RectFill(ScreenRastPort, 0, bitmapheight - 3, x - EXTRAWIDTH, bitmapheight - 3);
 	}
 }
 
-static void MainLoop(void)
+static void main_loop(void)
 {
 	if (!options.how) {
-		HardWaitBlit();
-		WaitVBL();
+		hard_wait_blit();
+		wait_vbl();
 
 		// activate copperlist
 		custom->copjmp2 = 0;
 	}
 
-	while (!LMBDown()) {
+	while (!lmb_down()) {
 		if (!options.how) {
-			WaitVBeam(199);
-			WaitVBeam(200);
+			wait_vbeam(199);
+			wait_vbeam(200);
 		} else {
 			Delay(1);
 		}
 
-		if (options.speed) *(WORD *)0xdff180 = 0xFF0;
+		if (options.speed) *(WORD *) 0xdff180 = 0xFF0;
 
-		CheckJoyScroll();
+		check_joy_scroll();
 
-		if (options.speed) *(WORD *)0xdff180 = 0xF00;
-		if (!options.how) UpdateCopperlist();
-		else ShowWhatCopperWouldDo();
+		if (options.speed) *(WORD *) 0xdff180 = 0xF00;
+		if (!options.how) update_copper_list();
+		else show_what_copper_would_do();
 	}
 }
-
-/********************* MAIN *************************/
 
 int main(int argc, char **argv)
 {
 	BOOL res = get_arguments(&options, s);
-    if (!res) Cleanup(s);
+    if (!res) cleanup(s);
 	res = read_level_map(LARGE_MAP_PATH, &level_map, s);
-    if (!res) Cleanup(s);
+    if (!res) cleanup(s);
 
 	BlocksBitmap = read_blocks(DEMO_BLOCKS_PATH, colors, s, BLOCKSWIDTH, BLOCKSHEIGHT);
-    if (!BlocksBitmap) Cleanup(s);
+    if (!BlocksBitmap) cleanup(s);
 	blocksbuffer = BlocksBitmap->Planes[0];
 
-	OpenDisplay();
+	open_display();
 
 	if (!options.how) {
 		Delay(2*50);
-		KillSystem();
-		InitCopperlist();
+		kill_system();
+		init_copper_list();
 	}
-	FillScreen();
-	MainLoop();
+	fill_screen();
+	main_loop();
 
-	if (!options.how) ActivateSystem();
-	Cleanup(0);
+	if (!options.how) activate_system();
+	cleanup(0);
     return 0;
 }

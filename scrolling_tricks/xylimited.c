@@ -191,7 +191,7 @@ static void InitCopperlist(void)
 	ULONG	plane,plane2;
 	LONG	l;
 
-	WaitVBL();
+	wait_vbl();
 
 	custom->dmacon = 0x7FFF;
 	custom->beamcon0 = options.ntsc ? 0 : DISPLAYPAL;
@@ -274,7 +274,7 @@ static void DrawBlock(LONG x,LONG y,LONG mapx,LONG mapy)
 
 	if (options.how) OwnBlitter();
 
-	HardWaitBlit();
+	hard_wait_blit();
 	custom->bltcon0 = 0x9F0;	// use A and D. Op: D = A
 	custom->bltcon1 = 0;
 	custom->bltafwm = 0xFFFF;
@@ -515,7 +515,7 @@ static void ScrollLeft(void)
 	x = ROUND2BLOCKWIDTH(videoposx);
 
 	if (previous_xdirection == DIRECTION_RIGHT) {
-		HardWaitBlit();
+		hard_wait_blit();
 		*savewordpointer = saveword;
 	}
 
@@ -564,7 +564,7 @@ static void ScrollRight(void)
 	x = ROUND2BLOCKWIDTH(videoposx);
 
 	if (previous_xdirection == DIRECTION_LEFT) {
-		HardWaitBlit();
+		hard_wait_blit();
 		*savewordpointer = saveword;
 	}
 
@@ -646,28 +646,28 @@ static void CheckJoyScroll(void)
 {
 	WORD i,count;
 
-	if (JoyFire()) count = 4;
+	if (joy_fire()) count = 4;
     else count = 1;
 
-	if (JoyUp()) {
+	if (joy_up()) {
 		for (i = 0; i < count; i++) {
 			ScrollUp();
 		}
 	}
 
-	if (JoyDown()) {
+	if (joy_down()) {
 		for (i = 0; i < count; i++) {
 			ScrollDown();
 		}
 	}
 
-	if (JoyLeft()) {
+	if (joy_left()) {
 		for (i = 0; i < count; i++) {
 			ScrollLeft();
 		}
 	}
 
-	if (JoyRight()) {
+	if (joy_right()) {
 		for (i = 0; i < count; i++) {
 			ScrollRight();
 		}
@@ -752,16 +752,16 @@ static void MainLoop(void)
 {
 	if (!options.how) {
 		// activate copperlist
-		HardWaitBlit();
-		WaitVBL();
+		hard_wait_blit();
+		wait_vbl();
 		custom->copjmp2 = 0;
 	}
 
-	while (!LMBDown()) {
+	while (!lmb_down()) {
 		if (!options.how) {
-			WaitVBeam(1);
+			wait_vbeam(1);
 			UpdateCopperlist();
-			WaitVBeam(200);
+			wait_vbeam(200);
 		} else {
 			Delay(1);
 		}
@@ -790,7 +790,7 @@ int main(int argc, char **argv)
 
 	if (!options.how) {
 		Delay(2*50);
-		KillSystem();
+		kill_system();
 		InitCopperlist();
 	}
 
@@ -798,7 +798,7 @@ int main(int argc, char **argv)
 	MainLoop();
 
 	if (!options.how) {
-		ActivateSystem();
+		activate_system();
 	}
 	Cleanup(0);
     return 0;

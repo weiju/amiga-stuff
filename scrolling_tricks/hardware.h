@@ -11,17 +11,17 @@
 #define BPL0_BPU3_F        0x10
 #define BPL0_BPUMASK			0x7000
 
-void KillSystem(void);
-void ActivateSystem(void);
-void WaitVBL(void);
-void WaitVBeam(ULONG line);
-void HardWaitBlit(void);
-void HardWaitLMB(void);
+void kill_system(void);
+void activate_system(void);
+void wait_vbl(void);
+void wait_vbeam(ULONG line);
+void hard_wait_blit(void);
 
-BOOL JoyLeft(void);
-BOOL JoyRight(void);
-BOOL JoyUp(void);
-BOOL JoyDown(void);
-BOOL JoyFire(void);
-BOOL LMBDown(void);
+BOOL joy_left(void);
+BOOL joy_right(void);
+BOOL joy_up(void);
+BOOL joy_down(void);
+
+BOOL joy_fire(void);
+BOOL lmb_down(void);
 

@@ -155,7 +155,7 @@ static void InitCopperlist(void)
 	WORD	*wp;
 	LONG l;
 
-	WaitVBL();
+	wait_vbl();
 
 	custom->dmacon = 0x7FFF;
 	custom->beamcon0 = options.ntsc ? 0 : DISPLAYPAL;
@@ -221,7 +221,7 @@ static void DrawBlock(LONG x,LONG y,LONG mapx,LONG mapy)
 
 	if (options.how) OwnBlitter();
 
-	HardWaitBlit();
+	hard_wait_blit();
 
 	custom->bltcon0 = 0x9F0;	// use A and D. Op: D = A
 	custom->bltcon1 = 0;
@@ -318,15 +318,15 @@ static void CheckJoyScroll(void)
 {
 	WORD i,count;
 
-	if (JoyFire()) count = 8; else count = 1;
+	if (joy_fire()) count = 8; else count = 1;
 
-	if (JoyUp()) {
+	if (joy_up()) {
 		for (i = 0; i < count; i++)	{
 			ScrollUp();
 		}
 	}
 
-	if (JoyDown()) {
+	if (joy_down()) {
 		for (i = 0; i < count; i++) {
 			ScrollDown();
 		}
@@ -357,15 +357,15 @@ static void MainLoop(void)
 {
 	if (!options.how) {
 		// activate copperlist
-		HardWaitBlit();
-		WaitVBL();
+		hard_wait_blit();
+		wait_vbl();
 		custom->copjmp2 = 0;
 	}
 
-	while (!LMBDown()) {
+	while (!lmb_down()) {
 		if (!options.how) {
-			WaitVBeam(199);
-			WaitVBeam(200);
+			wait_vbeam(199);
+			wait_vbeam(200);
 		} else {
 			Delay(1);
 		}
@@ -398,14 +398,14 @@ int main(int argc, char **argv)
 
 	if (!options.how) {
 		Delay(2*50);
-		KillSystem();
+		kill_system();
 		InitCopperlist();
 	}
 	FillScreen();
 	MainLoop();
 
 	if (!options.how) {
-		ActivateSystem();
+		activate_system();
 	}
 	Cleanup(0);
     return 0;
