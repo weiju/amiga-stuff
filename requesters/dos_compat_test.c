@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "chibi.h"
+#include "../chibi_test/chibi.h"
 #include "dos_compat.h"
 
 CHIBI_TEST(TestPathPartNull)

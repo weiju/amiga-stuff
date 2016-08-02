@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "chibi.h"
+#include "../chibi_test/chibi.h"
 #include "file_list.h"
 
 CHIBI_TEST(TestMakeEntry)
