@@ -1,5 +1,5 @@
 CC=vc +aos68k
-CFLAGS=-c99 -I$(MUI_INC) -I$(NDK_INC) -DCLIB_MUIMASTER_PROTOS_H
+CFLAGS=-c99 -I$(MUI_INC) -I$(NDK_INC)
 OBJECTS=main.o canvas.o
 EXE=blitplay
 

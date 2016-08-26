@@ -21,7 +21,7 @@
 #include <clib/alib_protos.h>
 
 #include <libraries/mui.h>
-#include <inline/muimaster_protos.h>
+#include <clib/muimaster_protos.h>
 
 #include "mui_util.h"
 #include "canvas.h"
