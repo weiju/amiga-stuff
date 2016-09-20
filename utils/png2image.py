@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """
 For license, see gpl-3.0.txt
@@ -9,7 +9,7 @@ import math
 import sys
 
 def chunks(l, n):
-    for i in xrange(0, len(l), n):
+    for i in range(0, len(list(l)), n):
         yield l[i:i+n]
 
 def color_to_plane_bits(color, depth):
@@ -51,24 +51,27 @@ def write_amiga_image(image, outfile):
     outfile.write('#include <intuition/intuition.h>\n\n')
 
     outfile.write("/* Ensure that this data is within chip memory or you'll see nothing !!! */\n");
-    outfile.write('UWORD imdata[] = {\n')
-    for plane in planes:
-        for chunk in chunks(plane, map_words_per_row):
-            outfile.write(','.join(map(str, chunk)))
-            outfile.write(',\n')
+    outfile.write('UWORD __chip imdata[] = {\n')
+    indent = 4
+    for i, plane in enumerate(planes):
+        outfile.write(' ' * indent + '// plane %d\n' % i)
+        lines = [(' ' * indent) + ','.join(['0x%04x' % i for i in chunk])
+                 for chunk in chunks(plane, map_words_per_row)]
+        outfile.write(',\n'.join(lines))
         outfile.write('\n')
     outfile.write('};\n\n')
 
 
     planepick = 2 ** depth - 1  # currently we always use all of the planes
     outfile.write('struct Image image = {\n')
-    outfile.write('  0, 0, %d, %d, %d, imdata,\n' % (width, height, depth));
-    outfile.write('  %d, 0, NULL\n' % planepick)  # PlanePick, PlaneOnOff
+    outfile.write(' ' * indent + '0, 0, %d, %d, %d, imdata,\n' % (width, height, depth));
+    outfile.write(' ' * indent + '%d, 0, NULL\n' % planepick)  # PlanePick, PlaneOnOff
     outfile.write('};\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Amiga Image converter')
     parser.add_argument('pngfile')
+    parser.add_argument('--plain', default=False)
 
     args = parser.parse_args()
     im = Image.open(args.pngfile)
