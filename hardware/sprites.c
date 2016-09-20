@@ -10,13 +10,7 @@
 #include <stdio.h>
 
 /*
- * This is essentially the code for startup.asm from
- * "Amiga Demo Coders Reference Manual" translated to C.
- *
- * This allows a program which operates directly on the hardware
- * to play nice with the operating system and ensure a clean exit
- * to Workbench.
- * A great starting point to use as a template for demos and games.
+ * A simple setup to display a sprite.
  */
 extern struct Custom custom;
 extern struct CIA ciaa, ciab;
@@ -32,6 +26,8 @@ void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
 
 #define BPLCON0       0x100
 #define COLOR00       0x180
+#define SPR0PTH       0x120
+#define SPR0PTL       0x122
 
 #define BPLCON0_COLOR (1 << 9)
 
@@ -39,25 +35,30 @@ void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
 #define COP_WAIT_END  0xffff, 0xfffe
 
 static UWORD __chip coplist_pal[] = {
-    COP_MOVE(BPLCON0, BPLCON0_COLOR),
-    COP_MOVE(COLOR00, 0x000),
-    0x8107, 0xfffe,            // wait for $8107,$fffe
-    COP_MOVE(COLOR00, 0xf00),
-    0xd607, 0xfffe,            // wait for $d607,$fffe
-    COP_MOVE(COLOR00, 0xff0),
+    COP_MOVE(SPR0PTH, 0x0000),
+    COP_MOVE(SPR0PTL, 0x0000),
     COP_WAIT_END,
     COP_WAIT_END
 };
 static UWORD __chip coplist_ntsc[] = {
-    COP_MOVE(BPLCON0, BPLCON0_COLOR),
-    COP_MOVE(COLOR00, 0x000),
-    0x6e07, 0xfffe,           // wait for $6e07,$fffe
-    COP_MOVE(COLOR00, 0xf00),
-    0xb007, 0xfffe,           // wait for $b007,$fffe
-    COP_MOVE(COLOR00, 0xff0),
+    COP_MOVE(SPR0PTL, 0x0000),
+    COP_MOVE(SPR0PTH, 0x0000),
     COP_WAIT_END,
     COP_WAIT_END
 };
+
+// space ship data from the Hardware Reference Manual
+static UWORD __chip spdat0[] = {
+    0x6d60, 0x7200,  // VSTART+HSTART, VSTOP
+    // data here
+    0x0990, 0x07e0,
+    0x13c8, 0x0ff0,
+    0x23c4, 0x1ff8,
+    0x13c8, 0x0ff0,
+    0x0990, 0x07e0,
+    0x0000, 0x0000
+};
+
 
 static struct Screen *wbscreen;
 static ULONG oldresolution;
@@ -133,6 +134,11 @@ int main(int argc, char **argv)
     BYTE old_prio = SetTaskPri(current_task, TASK_PRIORITY);
     struct View *current_view = ((struct GfxBase *) GfxBase)->ActiView;
     UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
+
+    coplist_ntsc[1] = ((ULONG) spdat0) & 0xffff;
+    coplist_ntsc[3] = (((ULONG) spdat0) >> 16) & 0xffff;
+    coplist_pal[1] = ((ULONG) spdat0) & 0xffff;
+    coplist_pal[3] = (((ULONG) spdat0) >> 16) & 0xffff;
 
     init_display(lib_version);
 
