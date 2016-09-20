@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 For license, see gpl-3.0.txt
@@ -23,10 +23,10 @@ def color_to_plane_bits(color, depth):
 def write_amiga_image(image, outfile):
     imdata = im.getdata()
     width, height = im.size
-    colors = [i for i in chunks(map(ord, im.palette.tobytes()), 3)]
+    colors = [i for i in chunks([b for b in im.palette.tobytes()], 3)]
     depth = int(math.log(len(colors), 2))
 
-    map_words_per_row = width / 16
+    map_words_per_row = int(width / 16)
     if width % 16 > 0:
         map_words_per_row += 1
 
@@ -42,7 +42,7 @@ def write_amiga_image(image, outfile):
                 planebits = color_to_plane_bits(color, depth)
                 # now we need to "or" the bits into the words in their respective planes
                 wordidx = (x + i) / 16  # word number in current row
-                pos = y * map_words_per_row + wordidx  # list index in the plane
+                pos = int(y * map_words_per_row + wordidx)  # list index in the plane
                 for planeidx in range(depth):
                     if planebits[planeidx]:
                         planes[planeidx][pos] |= (1 << (15 - (x + i) % 16)) # 1 << ((x + i) % 16)
