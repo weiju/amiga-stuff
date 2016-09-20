@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 """
 fdtool.py - simple FD file processing tool.
 
@@ -36,7 +36,7 @@ def process_command(command, state):
     elif command.startswith('end'):
         pass
     else:
-        print "unsupported command: ", command
+        print("unsupported command: ", command)
 
 
 def process_fundef(line, state):
@@ -46,10 +46,9 @@ def process_fundef(line, state):
         name, params, regs = match.group(1, 2, 3)
         if state.public:
             if len(params) > 0:
-                print "-%d -> %s(%s), [%s]" % (state.offset,
-                                               name, params, regs)
+                print("-%d -> %s(%s), [%s]" % (state.offset, name, params, regs))
             else:
-                print "-%d -> %s()" % (state.offset, name)
+                print("-%d -> %s()" % (state.offset, name))
         state.offset += 6
 
 
@@ -64,7 +63,7 @@ def process(input_file):
                 process_command(line[2:], state)
             else:
                 process_fundef(line.strip(), state)
-    print "Done."
+    print("Done.")
 
 if __name__ == '__main__':
     description = """fdtool - stub generator for FD files (c) 2013"""
