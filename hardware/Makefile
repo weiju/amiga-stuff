@@ -1,13 +1,16 @@
 CC=vc +kick13
 CFLAGS=-c99 -I$(NDK_INC) -DDEBUG -O2
 
-all: startup sprites
+all: startup sprites playfield1
 
 clean:
-	rm -f *.o startup sprites
+	rm -f *.o startup sprites playfield1
 
 startup: startup.o
 	$(CC) $(CFLAGS) $^ -lamiga -lauto -o $@
 
 sprites: sprites.o
+	$(CC) $(CFLAGS) $^ -lamiga -lauto -o $@
+
+playfield1: playfield1.o
 	$(CC) $(CFLAGS) $^ -lamiga -lauto -o $@
