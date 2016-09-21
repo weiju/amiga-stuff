@@ -27,7 +27,7 @@ def write_amiga_image(image, outfile, img_name, use_intuition):
 
     # colors is a list of 3-integer lists ([[r1, g1, b1], ...])
     colors = [i for i in chunks([b for b in im.palette.tobytes()], 3)]
-    depth = int(math.log(len(colors), 2))
+    depth = round(math.log(len(colors), 2))
 
     map_words_per_row = int(width / 16)
     if width % 16 > 0:
@@ -58,12 +58,13 @@ def write_amiga_image(image, outfile, img_name, use_intuition):
     outfile.write('UWORD __chip %s[] = {\n' % imgdata_varname)
     indent = 4
     for i, plane in enumerate(planes):
+        if i > 0:
+            outfile.write(',\n')
         outfile.write(' ' * indent + '// plane %d\n' % i)
         lines = [(' ' * indent) + ','.join(['0x%04x' % i for i in chunk])
                  for chunk in chunks(plane, map_words_per_row)]
         outfile.write(',\n'.join(lines))
-        outfile.write('\n')
-    outfile.write('};\n\n')
+    outfile.write('\n};\n\n')
 
 
     planepick = 2 ** depth - 1  # currently we always use all of the planes

@@ -15,12 +15,14 @@
 
 #ifdef USE_PAL
 #if NUM_BITPLANES == 1
-#include "test-320x256.h"
+#include "test320x256.h"
+#define NUM_COLORS 2
 #else
-#include "test-320x256x2.h"
+#include "test320x256x2.h"
+#define NUM_COLORS 4
 #endif
 #else
-#include "test-320x200.h"
+#include "test320x200.h"
 #endif
 
 /*
@@ -123,8 +125,8 @@ int main(int argc, char **argv)
     UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
 
     BOOL is_pal = init_display(lib_version);
-    ULONG pl1data = (ULONG) imdata;
-    ULONG pl2data = ((ULONG) &imdata[20 * NUM_RASTER_LINES]);
+    ULONG pl1data = (ULONG) image_data;
+    ULONG pl2data = ((ULONG) &image_data[20 * NUM_RASTER_LINES]);
 
     // hardcoded for UAE, since it seems that the mode returned is always NTSC
     is_pal = USE_PAL;
@@ -141,10 +143,9 @@ int main(int argc, char **argv)
 
     custom.diwstrt = DIWSTRT_VALUE;
     custom.diwstop = DIWSTOP_VALUE;
-    custom.color[0] = COLOR0;  // background red
-    custom.color[1] = COLOR1;  // color 1 is yellow
-    custom.color[2] = COLOR2;
-    custom.color[3] = COLOR3;
+    for (int i = 0; i < NUM_COLORS; i++) {
+        custom.color[i] = image_colors[i];
+    }
 
     // Initialize copper list with image data address
     coplist[1] = (pl1data >> 16) & 0xffff;
