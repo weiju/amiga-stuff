@@ -9,10 +9,16 @@
 #include <graphics/videocontrol.h>
 #include <stdio.h>
 
-#define USE_PAL 1
+#include "common.h"
+
+#define NUM_BITPLANES 2
 
 #ifdef USE_PAL
+#if NUM_BITPLANES == 1
 #include "test-320x256.h"
+#else
+#include "test-320x256x2.h"
+#endif
 #else
 #include "test-320x200.h"
 #endif
@@ -27,30 +33,17 @@ extern struct Library *GfxBase;
 // VBCC Inline assembly
 void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
 
-#define EXEC_BASE (4L)
-#define TASK_PRIORITY 127
-#define VFREQ_PAL 50
-#define WB_SCREEN_NAME "Workbench"
-
-#define BPLCON0       0x100
-#define COLOR00       0x180
-#define SPR0PTH       0x120
-#define SPR0PTL       0x122
-#define BPL1PTH       0x0e0
-#define BPL1PTL       0x0e2
-
-
-#define BPLCON0_COLOR (1 << 9)
 
 #define COLOR0        0x00a
 #define COLOR1        0xfff
-
-#define COP_MOVE(addr, data) addr, data
-#define COP_WAIT_END  0xffff, 0xfffe
+#define COLOR2        0xf00
+#define COLOR3        0x00f
 
 static UWORD __chip coplist[] = {
     COP_MOVE(BPL1PTH, 0),
     COP_MOVE(BPL1PTL, 0),
+    COP_MOVE(BPL2PTH, 0),
+    COP_MOVE(BPL2PTL, 0),
     COP_WAIT_END,
     COP_WAIT_END
 };
@@ -130,24 +123,34 @@ int main(int argc, char **argv)
     UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
 
     BOOL is_pal = init_display(lib_version);
+    ULONG pl1data = (ULONG) imdata;
+    ULONG pl2data = ((ULONG) &imdata[20 * NUM_RASTER_LINES]);
 
     // hardcoded for UAE, since it seems that the mode returned is always NTSC
     is_pal = USE_PAL;
 
+#if NUM_BITPLANES == 1
     custom.bplcon0 = 0x1200;  // use bitplane 1 = BPU 001, composite color enable
+#else
+    custom.bplcon0 = 0x2200;  // use bitplane 1+2 = BPU 010, composite color enable
+#endif
     custom.bplcon1 = 0;  // horizontal scroll value = 0 for all playfields
     custom.bpl1mod = 0;  // modulo = 0 for odd bitplanes
-    custom.ddfstrt = 0x0038;
-    custom.ddfstop = 0x00d0;
+    custom.ddfstrt = DDFSTRT_VALUE;
+    custom.ddfstop = DDFSTOP_VALUE;
 
-    custom.diwstrt = 0x2c81;
-    custom.diwstop = is_pal ? 0x2c81 : 0xf4c1;
+    custom.diwstrt = DIWSTRT_VALUE;
+    custom.diwstop = DIWSTOP_VALUE;
     custom.color[0] = COLOR0;  // background red
     custom.color[1] = COLOR1;  // color 1 is yellow
+    custom.color[2] = COLOR2;
+    custom.color[3] = COLOR3;
 
     // Initialize copper list with image data address
-    coplist[1] = (((ULONG) imdata) >> 16) & 0xffff;
-    coplist[3] = ((ULONG) imdata) & 0xffff;
+    coplist[1] = (pl1data >> 16) & 0xffff;
+    coplist[3] = pl1data & 0xffff;
+    coplist[5] = (pl2data >> 16) & 0xffff;
+    coplist[7] = pl2data & 0xffff;
 
     // and point to the copper list
     custom.cop1lc = (ULONG) coplist;
