@@ -9,7 +9,13 @@
 #include <graphics/videocontrol.h>
 #include <stdio.h>
 
+#define USE_PAL 1
+
+#ifdef USE_PAL
+#include "test-320x256.h"
+#else
 #include "test-320x200.h"
+#endif
 
 /*
  * A simple setup to display a playfield with a depth of 1 bit.
@@ -125,13 +131,17 @@ int main(int argc, char **argv)
 
     BOOL is_pal = init_display(lib_version);
 
+    // hardcoded for UAE, since it seems that the mode returned is always NTSC
+    is_pal = USE_PAL;
+
     custom.bplcon0 = 0x1200;  // use bitplane 1 = BPU 001, composite color enable
     custom.bplcon1 = 0;  // horizontal scroll value = 0 for all playfields
     custom.bpl1mod = 0;  // modulo = 0 for odd bitplanes
     custom.ddfstrt = 0x0038;
     custom.ddfstop = 0x00d0;
+
     custom.diwstrt = 0x2c81;
-    custom.diwstop = 0xf4c1;
+    custom.diwstop = is_pal ? 0x2c81 : 0xf4c1;
     custom.color[0] = COLOR0;  // background red
     custom.color[1] = COLOR1;  // color 1 is yellow
 
