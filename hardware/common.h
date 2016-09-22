@@ -50,4 +50,7 @@
 #define COP_MOVE(addr, data) addr, data
 #define COP_WAIT_END  0xffff, 0xfffe
 
+extern BOOL init_display(UWORD lib_version);
+extern void reset_display(struct View *current_view, UWORD lib_version);
+
 #endif /* __COMMON_DEFS_H__ */
