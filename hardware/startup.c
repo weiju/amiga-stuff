@@ -14,6 +14,7 @@
  * A great starting point to use as a template for demos and games.
  */
 extern struct Custom custom;
+char VERSION_STRING[] = "\0$VER: startup 1.0 (21.09.2016)\0";
 
 static UWORD __chip coplist_pal[] = {
     COP_MOVE(BPLCON0, BPLCON0_COMPOSITE_COLOR),
@@ -41,7 +42,13 @@ int main(int argc, char **argv)
     struct Task *current_task = FindTask(NULL);
     BYTE old_prio = SetTaskPri(current_task, TASK_PRIORITY);
     BOOL is_pal = init_display();
+
     custom.cop1lc = is_pal ? (ULONG) coplist_pal : (ULONG) coplist_ntsc;
+
+    // strobe the COPJMP1 register to make sure the system is using
+    // copper list 1 (I found out that leaving this out can lead to
+    // strange effects on an emulated 4000 system)
+    custom.copjmp1 = 1;
 
     waitmouse();
 

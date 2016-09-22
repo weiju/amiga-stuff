@@ -7,6 +7,7 @@
  * A simple setup to display a sprite.
  */
 extern struct Custom custom;
+char VERSION_STRING[] = "\0$VER: sprites 1.0 (21.09.2016)\0";
 
 static UWORD __chip coplist_pal[] = {
     COP_MOVE(SPR0PTH, 0x0000),
@@ -44,6 +45,7 @@ int main(int argc, char **argv)
     coplist_pal[3] = (((ULONG) spdat0) >> 16) & 0xffff;
 
     custom.cop1lc = is_pal ? (ULONG) coplist_pal : (ULONG) coplist_ntsc;
+    custom.copjmp1 = 1;
 
     waitmouse();
 

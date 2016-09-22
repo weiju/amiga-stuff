@@ -27,6 +27,7 @@
  * A simple setup to display a playfield with a depth of 1 bit.
  */
 extern struct Custom custom;
+char VERSION_STRING[] = "\0$VER: playfield1 1.0 (21.09.2016)\0";
 
 static UWORD __chip coplist[] = {
     COP_MOVE(BPL1PTH, 0),
@@ -80,6 +81,11 @@ int main(int argc, char **argv)
 
     // and point to the copper list
     custom.cop1lc = (ULONG) coplist;
+
+    // strobe the COPJMP1 register to make sure the system is using
+    // copper list 1 (I found out that leaving this out can lead to
+    // strange effects on an emulated 4000 system)
+    custom.copjmp1 = 1;
 
     waitmouse();
 
