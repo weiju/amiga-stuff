@@ -50,8 +50,8 @@
 #define COP_MOVE(addr, data) addr, data
 #define COP_WAIT_END  0xffff, 0xfffe
 
-extern BOOL init_display(UWORD lib_version);
-extern void reset_display(struct View *current_view, UWORD lib_version);
+extern BOOL init_display(void);
+extern void reset_display(void);
 
 // VBCC Inline assembly
 void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";

@@ -1,16 +1,12 @@
 #include <clib/exec_protos.h>
-#include <graphics/gfxbase.h>
 #include <hardware/custom.h>
-
 #include <stdio.h>
-
 #include "common.h"
 
 /*
  * A simple setup to display a sprite.
  */
 extern struct Custom custom;
-extern struct Library *GfxBase;
 
 static UWORD __chip coplist_pal[] = {
     COP_MOVE(SPR0PTH, 0x0000),
@@ -39,13 +35,9 @@ static UWORD __chip spdat0[] = {
 
 int main(int argc, char **argv)
 {
-    // translated startup.asm
     struct Task *current_task = FindTask(NULL);
     BYTE old_prio = SetTaskPri(current_task, TASK_PRIORITY);
-    struct View *current_view = ((struct GfxBase *) GfxBase)->ActiView;
-    UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
-
-    BOOL is_pal = init_display(lib_version);
+    BOOL is_pal = init_display();
     coplist_ntsc[1] = ((ULONG) spdat0) & 0xffff;
     coplist_ntsc[3] = (((ULONG) spdat0) >> 16) & 0xffff;
     coplist_pal[1] = ((ULONG) spdat0) & 0xffff;
@@ -55,6 +47,6 @@ int main(int argc, char **argv)
 
     waitmouse();
 
-    reset_display(current_view, lib_version);
+    reset_display();
     return 0;
 }

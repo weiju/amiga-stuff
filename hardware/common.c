@@ -46,8 +46,9 @@ static void UnapplySpriteFix(void)
     }
 }
 
-BOOL init_display(UWORD lib_version)
+BOOL init_display(void)
 {
+    UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
     BOOL is_pal;
 
     LoadView(NULL);  // clear display, reset hardware registers
@@ -67,8 +68,10 @@ BOOL init_display(UWORD lib_version)
     return is_pal;
 }
 
-void reset_display(struct View *current_view, UWORD lib_version)
+void reset_display(void)
 {
+    struct View *current_view = ((struct GfxBase *) GfxBase)->ActiView;
+    UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
     if (lib_version >= 39) UnapplySpriteFix();
     LoadView(current_view);
     WaitTOF();

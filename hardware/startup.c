@@ -1,12 +1,5 @@
 #include <hardware/custom.h>
-#include <hardware/cia.h>
-
 #include <clib/exec_protos.h>
-#include <clib/graphics_protos.h>
-#include <clib/intuition_protos.h>
-#include <exec/execbase.h>
-#include <graphics/gfxbase.h>
-#include <graphics/videocontrol.h>
 #include <stdio.h>
 
 #include "common.h"
@@ -21,7 +14,6 @@
  * A great starting point to use as a template for demos and games.
  */
 extern struct Custom custom;
-extern struct Library *GfxBase;
 
 static UWORD __chip coplist_pal[] = {
     COP_MOVE(BPLCON0, BPLCON0_COMPOSITE_COLOR),
@@ -46,17 +38,13 @@ static UWORD __chip coplist_ntsc[] = {
 
 int main(int argc, char **argv)
 {
-    // translated startup.asm
     struct Task *current_task = FindTask(NULL);
     BYTE old_prio = SetTaskPri(current_task, TASK_PRIORITY);
-    struct View *current_view = ((struct GfxBase *) GfxBase)->ActiView;
-    UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
-
-    BOOL is_pal = init_display(lib_version);
+    BOOL is_pal = init_display();
     custom.cop1lc = is_pal ? (ULONG) coplist_pal : (ULONG) coplist_ntsc;
 
     waitmouse();
 
-    reset_display(current_view, lib_version);
+    reset_display();
     return 0;
 }
