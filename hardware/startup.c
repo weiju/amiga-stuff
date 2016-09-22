@@ -9,6 +9,8 @@
 #include <graphics/videocontrol.h>
 #include <stdio.h>
 
+#include "common.h"
+
 /*
  * This is essentially the code for startup.asm from
  * "Amiga Demo Coders Reference Manual" translated to C.
@@ -19,27 +21,13 @@
  * A great starting point to use as a template for demos and games.
  */
 extern struct Custom custom;
-extern struct CIA ciaa, ciab;
 extern struct Library *GfxBase;
 
 // VBCC Inline assembly
 void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
 
-#define EXEC_BASE (4L)
-#define TASK_PRIORITY 127
-#define VFREQ_PAL 50
-#define WB_SCREEN_NAME "Workbench"
-
-#define BPLCON0       0x100
-#define COLOR00       0x180
-
-#define BPLCON0_COLOR (1 << 9)
-
-#define COP_MOVE(addr, data) addr, data
-#define COP_WAIT_END  0xffff, 0xfffe
-
 static UWORD __chip coplist_pal[] = {
-    COP_MOVE(BPLCON0, BPLCON0_COLOR),
+    COP_MOVE(BPLCON0, BPLCON0_COMPOSITE_COLOR),
     COP_MOVE(COLOR00, 0x000),
     0x8107, 0xfffe,            // wait for $8107,$fffe
     COP_MOVE(COLOR00, 0xf00),
@@ -49,7 +37,7 @@ static UWORD __chip coplist_pal[] = {
     COP_WAIT_END
 };
 static UWORD __chip coplist_ntsc[] = {
-    COP_MOVE(BPLCON0, BPLCON0_COLOR),
+    COP_MOVE(BPLCON0, BPLCON0_COMPOSITE_COLOR),
     COP_MOVE(COLOR00, 0x000),
     0x6e07, 0xfffe,           // wait for $6e07,$fffe
     COP_MOVE(COLOR00, 0xf00),
@@ -109,7 +97,7 @@ static BOOL init_display(UWORD lib_version)
     } else {
         // Note: FS-UAE reports 0 this, so essentially, there is no information
         // for 1.x
-        printf("PAL/NTSC: %d\n", (int) ((struct ExecBase *) EXEC_BASE)->VBlankFrequency);
+        //printf("PAL/NTSC: %d\n", (int) ((struct ExecBase *) EXEC_BASE)->VBlankFrequency);
         is_pal = ((struct ExecBase *) EXEC_BASE)->VBlankFrequency == VFREQ_PAL;
     }
     custom.cop1lc = is_pal ? (ULONG) coplist_pal : (ULONG) coplist_ntsc;

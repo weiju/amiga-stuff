@@ -34,7 +34,6 @@
  * A simple setup to display a playfield with a depth of 1 bit.
  */
 extern struct Custom custom;
-extern struct CIA ciaa, ciab;
 extern struct Library *GfxBase;
 
 // VBCC Inline assembly

@@ -9,30 +9,15 @@
 #include <graphics/videocontrol.h>
 #include <stdio.h>
 
+#include "common.h"
 /*
  * A simple setup to display a sprite.
  */
 extern struct Custom custom;
-extern struct CIA ciaa, ciab;
 extern struct Library *GfxBase;
 
 // VBCC Inline assembly
 void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
-
-#define EXEC_BASE (4L)
-#define TASK_PRIORITY 127
-#define VFREQ_PAL 50
-#define WB_SCREEN_NAME "Workbench"
-
-#define BPLCON0       0x100
-#define COLOR00       0x180
-#define SPR0PTH       0x120
-#define SPR0PTL       0x122
-
-#define BPLCON0_COLOR (1 << 9)
-
-#define COP_MOVE(addr, data) addr, data
-#define COP_WAIT_END  0xffff, 0xfffe
 
 static UWORD __chip coplist_pal[] = {
     COP_MOVE(SPR0PTH, 0x0000),
@@ -58,7 +43,6 @@ static UWORD __chip spdat0[] = {
     0x0990, 0x07e0,
     0x0000, 0x0000
 };
-
 
 static struct Screen *wbscreen;
 static ULONG oldresolution;
@@ -113,7 +97,6 @@ static BOOL init_display(UWORD lib_version)
         printf("PAL/NTSC: %d\n", (int) ((struct ExecBase *) EXEC_BASE)->VBlankFrequency);
         is_pal = ((struct ExecBase *) EXEC_BASE)->VBlankFrequency == VFREQ_PAL;
     }
-    custom.cop1lc = is_pal ? (ULONG) coplist_pal : (ULONG) coplist_ntsc;
     return is_pal;
 }
 
@@ -135,12 +118,13 @@ int main(int argc, char **argv)
     struct View *current_view = ((struct GfxBase *) GfxBase)->ActiView;
     UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
 
+    BOOL is_pal = init_display(lib_version);
     coplist_ntsc[1] = ((ULONG) spdat0) & 0xffff;
     coplist_ntsc[3] = (((ULONG) spdat0) >> 16) & 0xffff;
     coplist_pal[1] = ((ULONG) spdat0) & 0xffff;
     coplist_pal[3] = (((ULONG) spdat0) >> 16) & 0xffff;
 
-    init_display(lib_version);
+    custom.cop1lc = is_pal ? (ULONG) coplist_pal : (ULONG) coplist_ntsc;
 
     waitmouse();
 
