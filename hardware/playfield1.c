@@ -11,16 +11,21 @@
 
 #include "common.h"
 
-#define NUM_BITPLANES 2
+#define NUM_BITPLANES 5
 
 #ifdef USE_PAL
+
 #if NUM_BITPLANES == 1
 #include "test320x256.h"
 #define NUM_COLORS 2
-#else
+#elif NUM_BITPLANES == 2
 #include "test320x256x2.h"
 #define NUM_COLORS 4
+#else
+#include "kingtut.h"
+#define NUM_COLORS 32
 #endif
+
 #else
 #include "test320x200.h"
 #endif
@@ -35,17 +40,17 @@ extern struct Library *GfxBase;
 // VBCC Inline assembly
 void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
 
-
-#define COLOR0        0x00a
-#define COLOR1        0xfff
-#define COLOR2        0xf00
-#define COLOR3        0x00f
-
 static UWORD __chip coplist[] = {
     COP_MOVE(BPL1PTH, 0),
     COP_MOVE(BPL1PTL, 0),
     COP_MOVE(BPL2PTH, 0),
     COP_MOVE(BPL2PTL, 0),
+    COP_MOVE(BPL3PTH, 0),
+    COP_MOVE(BPL3PTL, 0),
+    COP_MOVE(BPL4PTH, 0),
+    COP_MOVE(BPL4PTL, 0),
+    COP_MOVE(BPL5PTH, 0),
+    COP_MOVE(BPL5PTL, 0),
     COP_WAIT_END,
     COP_WAIT_END
 };
@@ -100,7 +105,7 @@ static BOOL init_display(UWORD lib_version)
     } else {
         // Note: FS-UAE reports 0 this, so essentially, there is no information
         // for 1.x
-        printf("PAL/NTSC: %d\n", (int) ((struct ExecBase *) EXEC_BASE)->VBlankFrequency);
+        //printf("PAL/NTSC: %d\n", (int) ((struct ExecBase *) EXEC_BASE)->VBlankFrequency);
         is_pal = ((struct ExecBase *) EXEC_BASE)->VBlankFrequency == VFREQ_PAL;
     }
     return is_pal;
@@ -125,6 +130,7 @@ int main(int argc, char **argv)
     UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
 
     BOOL is_pal = init_display(lib_version);
+
     ULONG pl1data = (ULONG) image_data;
     ULONG pl2data = ((ULONG) &image_data[20 * NUM_RASTER_LINES]);
 
@@ -133,8 +139,10 @@ int main(int argc, char **argv)
 
 #if NUM_BITPLANES == 1
     custom.bplcon0 = 0x1200;  // use bitplane 1 = BPU 001, composite color enable
+#elif NUM_BITPLANES == 2
+    custom.bplcon0 = 0x2200;  // use bitplane 1-2 = BPU 010, composite color enable
 #else
-    custom.bplcon0 = 0x2200;  // use bitplane 1+2 = BPU 010, composite color enable
+    custom.bplcon0 = 0x5200;  // use bitplane 1-5 = BPU 101, composite color enable
 #endif
     custom.bplcon1 = 0;  // horizontal scroll value = 0 for all playfields
     custom.bpl1mod = 0;  // modulo = 0 for odd bitplanes
@@ -148,10 +156,11 @@ int main(int argc, char **argv)
     }
 
     // Initialize copper list with image data address
-    coplist[1] = (pl1data >> 16) & 0xffff;
-    coplist[3] = pl1data & 0xffff;
-    coplist[5] = (pl2data >> 16) & 0xffff;
-    coplist[7] = pl2data & 0xffff;
+    for (int i = 0; i < NUM_BITPLANES; i++) {
+        ULONG addr = (ULONG) &(image_data[i * 20 * NUM_RASTER_LINES]);
+        coplist[i * 4 + 1] = (addr >> 16) & 0xffff;
+        coplist[i * 4 + 3] = addr & 0xffff;
+    }
 
     // and point to the copper list
     custom.cop1lc = (ULONG) coplist;

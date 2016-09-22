@@ -7,6 +7,12 @@
 #define BPL1PTL       0x0e2
 #define BPL2PTH       0x0e4
 #define BPL2PTL       0x0e6
+#define BPL3PTH       0x0e8
+#define BPL3PTL       0x0ea
+#define BPL4PTH       0x0ec
+#define BPL4PTL       0x0ee
+#define BPL5PTH       0x0f0
+#define BPL5PTL       0x0f2
 
 #define BPLCON0       0x100
 #define COLOR00       0x180
