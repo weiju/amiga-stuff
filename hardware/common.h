@@ -16,9 +16,23 @@
 #define BPL5PTL       0x0f2
 
 #define BPLCON0       0x100
-#define COLOR00       0x180
 #define SPR0PTH       0x120
 #define SPR0PTL       0x122
+#define SPR1PTH       0x124
+#define SPR1PTL       0x126
+#define SPR2PTH       0x128
+#define SPR2PTL       0x12a
+#define SPR3PTH       0x12c
+#define SPR3PTL       0x12e
+#define SPR4PTH       0x130
+#define SPR4PTL       0x132
+#define SPR5PTH       0x134
+#define SPR5PTL       0x136
+#define SPR6PTH       0x138
+#define SPR6PTL       0x13a
+#define SPR7PTH       0x13c
+#define SPR7PTL       0x13e
+#define COLOR00       0x180
 
 
 #define USE_PAL 1
