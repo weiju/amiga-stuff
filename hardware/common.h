@@ -53,4 +53,7 @@
 extern BOOL init_display(UWORD lib_version);
 extern void reset_display(struct View *current_view, UWORD lib_version);
 
+// VBCC Inline assembly
+void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
+
 #endif /* __COMMON_DEFS_H__ */

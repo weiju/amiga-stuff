@@ -23,9 +23,6 @@
 extern struct Custom custom;
 extern struct Library *GfxBase;
 
-// VBCC Inline assembly
-void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
-
 static UWORD __chip coplist_pal[] = {
     COP_MOVE(BPLCON0, BPLCON0_COMPOSITE_COLOR),
     COP_MOVE(COLOR00, 0x000),
