@@ -10,9 +10,11 @@
 #include "common.h"
 
 extern struct Custom custom;
-extern struct Library *GfxBase;
+extern struct GfxBase *GfxBase;
 static struct Screen *wbscreen;
 static ULONG oldresolution;
+
+struct ExecBase **exec_base_ptr = (struct ExecBase **) (4L);
 
 static void ApplySpriteFix(void)
 {
@@ -48,7 +50,7 @@ static void UnapplySpriteFix(void)
 
 BOOL init_display(void)
 {
-    UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
+    UWORD lib_version = GfxBase->LibNode.lib_Version;
     BOOL is_pal;
 
     LoadView(NULL);  // clear display, reset hardware registers
@@ -62,8 +64,9 @@ BOOL init_display(void)
     } else {
         // Note: FS-UAE reports 0 this, so essentially, there is no information
         // for 1.x
-        printf("PAL/NTSC: %d\n", (int) ((struct ExecBase *) EXEC_BASE)->VBlankFrequency);
-        is_pal = ((struct ExecBase *) EXEC_BASE)->VBlankFrequency == VFREQ_PAL;
+        int vblank_freq = (*exec_base_ptr)->VBlankFrequency;
+        printf("Gfx Lib version: %u, Vertical Blank Frequency: %d\n", lib_version, vblank_freq);
+        is_pal = vblank_freq == VFREQ_PAL;
     }
     return is_pal;
 }
@@ -71,7 +74,7 @@ BOOL init_display(void)
 void reset_display(void)
 {
     struct View *current_view = ((struct GfxBase *) GfxBase)->ActiView;
-    UWORD lib_version = ((struct Library *) GfxBase)->lib_Version;
+    UWORD lib_version = GfxBase->LibNode.lib_Version;
     if (lib_version >= 39) UnapplySpriteFix();
     LoadView(current_view);
     WaitTOF();

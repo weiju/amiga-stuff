@@ -3,6 +3,7 @@
 #define __COMMON_DEFS_H__
 
 // Custom Chip Registers
+#define DMACON        0x096
 #define BPL1PTH       0x0e0
 #define BPL1PTL       0x0e2
 #define BPL2PTH       0x0e4
@@ -26,8 +27,6 @@
 #define DIWSTRT_VALUE      0x2c81
 #define DIWSTOP_VALUE_PAL  0x2cc1
 #define DIWSTOP_VALUE_NTSC 0xf4c1
-
-#define EXEC_BASE (4L)
 
 // max priority for this task
 #define TASK_PRIORITY 127
