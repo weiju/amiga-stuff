@@ -1,3 +1,4 @@
+/* C version of How To Code 7 http://aminet.net/package/docs/misc/howtocode7 */
 #include <clib/graphics_protos.h>
 #include <clib/intuition_protos.h>
 #include <exec/execbase.h>
@@ -81,4 +82,12 @@ void reset_display(void)
     WaitTOF();
     custom.cop1lc = (ULONG) ((struct GfxBase *) GfxBase)->copinit;
     RethinkDisplay();
+}
+
+#define PRA_FIR0_BIT (1 << 6)
+
+void waitmouse(void)
+{
+    volatile UBYTE *ciaa_pra = (volatile UBYTE *) 0xbfe001;
+    while ((*ciaa_pra & PRA_FIR0_BIT) != 0) ;
 }

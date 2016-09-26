@@ -49,6 +49,11 @@ static UWORD __chip sprite_data[] = {
     0x0000, 0x0000
 };
 
+volatile UBYTE *ciaa_pra = (volatile UBYTE *) 0xbfe001;
+volatile UBYTE *custom_vhposr= (volatile UBYTE *) 0xdff006;
+#define PRA_FIR0_BIT (1 << 6)
+#define DELAY 1
+
 int main(int argc, char **argv)
 {
     struct Task *current_task = FindTask(NULL);
@@ -89,7 +94,29 @@ int main(int argc, char **argv)
     custom.dmacon  = 0x83a0;  // Bitplane + Copper + Sprite DMA activate
     custom.copjmp1 = 1;
 
-    waitmouse();
+    // wait for mouse button
+    UBYTE hstart = 0x60;
+    UBYTE vstart = 0x6d;
+    UBYTE vstop = 0x72;
+    int incx = 1, minx = 0x60, maxx = 0x90;
+    int incy = 1, miny = 0x6d, maxy = 0x90;
+    int delay = DELAY;
+
+    while ((*ciaa_pra & PRA_FIR0_BIT) != 0) {
+        // PAL vblank test
+        while (*custom_vhposr != 0x00) ;
+        delay--;
+        if (delay == 0) {
+            delay = DELAY;
+            hstart += incx;
+            vstart += incy;
+            if (hstart >= maxx || hstart <= minx) incx = -incx;
+            if (vstart >= maxy || vstart <= miny) incy = -incy;
+        }
+        vstop = vstart + 5;
+        sprite_data[0] = (vstart << 8) | hstart;
+        sprite_data[1] = vstop << 8;
+    }
 
     reset_display();
     return 0;

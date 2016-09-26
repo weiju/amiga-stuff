@@ -3,6 +3,11 @@
 #define __COMMON_DEFS_H__
 
 // Custom Chip Registers
+#define BLTDDAT       0x000
+#define DMACONR       0x002
+#define VPOSR         0x004
+#define VHPOSR        0x006
+
 #define DMACON        0x096
 #define BPL1PTH       0x0e0
 #define BPL1PTL       0x0e2
@@ -65,8 +70,6 @@
 
 extern BOOL init_display(void);
 extern void reset_display(void);
-
-// VBCC Inline assembly
-void waitmouse(void) = "waitmouse:\n\tbtst\t#6,$bfe001\n\tbne\twaitmouse";
+extern void waitmouse(void);
 
 #endif /* __COMMON_DEFS_H__ */
