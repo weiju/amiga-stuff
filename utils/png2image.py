@@ -21,13 +21,10 @@ def color_to_plane_bits(color, depth):
             result[bit] = 1
     return result
 
-def write_amiga_image(image, outfile, img_name, use_intuition):
+
+def extract_planes(im, depth):
     imdata = im.getdata()
     width, height = im.size
-
-    # colors is a list of 3-integer lists ([[r1, g1, b1], ...])
-    colors = [i for i in chunks([b for b in im.palette.tobytes()], 3)]
-    depth = round(math.log(len(colors), 2))
 
     map_words_per_row = int(width / 16)
     if width % 16 > 0:
@@ -50,7 +47,19 @@ def write_amiga_image(image, outfile, img_name, use_intuition):
                     if planebits[planeidx]:
                         planes[planeidx][pos] |= (1 << (15 - (x + i) % 16)) # 1 << ((x + i) % 16)
             x += 16
+    return planes, map_words_per_row
 
+def write_amiga_image(im, outfile, img_name, use_intuition, verbose):
+    imdata = im.getdata()
+    width, height = im.size
+
+    # colors is a list of 3-integer lists ([[r1, g1, b1], ...])
+    colors = [i for i in chunks([b for b in im.palette.tobytes()], 3)]
+    depth = round(math.log(len(colors), 2))
+    planes, map_words_per_row = extract_planes(im, depth)
+
+    if verbose:
+        print("image width: %d height: %d depth: %d" % (width, height, depth))
     if use_intuition:
         outfile.write('#include <intuition/intuition.h>\n\n')
     imgdata_varname = '%s_data' % img_name
@@ -97,11 +106,13 @@ if __name__ == '__main__':
     parser.add_argument('headerfile', help="output header file")
     parser.add_argument('--img_name', default='image', help="variable name of the image")
     parser.add_argument('--use_intuition', action='store_true', help="generate data for Intuition")
+    parser.add_argument('--verbose', action='store_true', help="verbose mode")
 
     args = parser.parse_args()
     im = Image.open(args.pngfile)
     if not os.path.exists(args.headerfile):
         with open(args.headerfile, 'w') as outfile:
-            write_amiga_image(im, outfile, img_name=args.img_name, use_intuition=args.use_intuition)
+            write_amiga_image(im, outfile, img_name=args.img_name, use_intuition=args.use_intuition,
+                              verbose=args.verbose)
     else:
         print("file '%s' already exists." % args.headerfile)

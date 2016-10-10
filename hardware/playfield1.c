@@ -27,6 +27,8 @@
  * A simple setup to display a playfield with a depth of 1 bit.
  */
 extern struct Custom custom;
+
+// version string for the version command to display
 char VERSION_STRING[] = "\0$VER: playfield1 1.0 (21.09.2016)\0";
 
 static UWORD __chip coplist[] = {
@@ -63,6 +65,7 @@ int main(int argc, char **argv)
 #endif
     custom.bplcon1 = 0;  // horizontal scroll value = 0 for all playfields
     custom.bpl1mod = 0;  // modulo = 0 for odd bitplanes
+    custom.dmacon  = 0x20;
     custom.ddfstrt = DDFSTRT_VALUE;
     custom.ddfstop = DDFSTOP_VALUE;
 
