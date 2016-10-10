@@ -5,19 +5,30 @@
 #include "common.h"
 
 #define NUM_BITPLANES 5
+#define INTERLEAVED
 
 #ifdef USE_PAL
 
 #if NUM_BITPLANES == 1
+
 #include "test320x256.h"
 #define NUM_COLORS 2
+
 #elif NUM_BITPLANES == 2
+
 #include "test320x256x2.h"
 #define NUM_COLORS 4
+
+#else
+
+#ifdef INTERLEAVED
+#include "kingtut-interleaved.h"
 #else
 #include "kingtut.h"
+#endif /* INTERLEAVED */
+
 #define NUM_COLORS 32
-#endif
+#endif /* NUM_BITPLANES */
 
 #else
 #include "test320x200.h"

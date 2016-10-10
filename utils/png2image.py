@@ -49,16 +49,41 @@ def extract_planes(im, depth):
             x += 16
     return planes, map_words_per_row
 
-def write_amiga_image(im, outfile, img_name, use_intuition, verbose):
+
+def interleave_planes(planes, map_words_per_row):
+    """transforms a set of bitplanes into a large array of 16-bit
+    word rows. each representing a line of an image
+    """
+    # 1. for each plane generate a list of lists of <map_words_per_row>
+    # values
+    chunked = list([list(chunks(plane, map_words_per_row)) for plane in planes])
+
+    # 2. for each plane, add the rows one after another to the result list
+    num_rows = len(chunked[0])
+    result = []
+    for i in range(num_rows):
+        for chunk in chunked:
+            result.append(chunk[i])
+    return result
+
+def write_amiga_image(im, outfile, img_name, use_intuition, interleaved, verbose):
     imdata = im.getdata()
     width, height = im.size
+    if width % 16 != 0:
+        raise Exception("width needs to be a multiple of 16, is: %d" % width)
 
     # colors is a list of 3-integer lists ([[r1, g1, b1], ...])
     colors = [i for i in chunks([b for b in im.palette.tobytes()], 3)]
     depth = round(math.log(len(colors), 2))
+    # fill the missing colors with black entries
+    num_missing_colors = 2 ** depth - len(colors)
+    colors += [[0, 0, 0]] * num_missing_colors
+
     planes, map_words_per_row = extract_planes(im, depth)
 
     if verbose:
+        if interleaved:
+            print('using interleaved mode')
         print("image width: %d height: %d depth: %d" % (width, height, depth))
     if use_intuition:
         outfile.write('#include <intuition/intuition.h>\n\n')
@@ -66,15 +91,21 @@ def write_amiga_image(im, outfile, img_name, use_intuition, verbose):
     outfile.write("/* Ensure that this data is within chip memory or you'll see nothing !!! */\n");
     outfile.write('UWORD __chip %s[] = {\n' % imgdata_varname)
     indent = 4
-    for i, plane in enumerate(planes):
-        if i > 0:
-            outfile.write(',\n')
-        outfile.write(' ' * indent + '// plane %d\n' % i)
-        lines = [(' ' * indent) + ','.join(['0x%04x' % i for i in chunk])
-                 for chunk in chunks(plane, map_words_per_row)]
-        outfile.write(',\n'.join(lines))
-    outfile.write('\n};\n\n')
 
+    if interleaved:
+        interleaved_data = interleave_planes(planes, map_words_per_row)
+        lines = [(' ' * indent + ','.join(['0x%04x' % v for v in row]))
+                 for row in interleaved_data]
+        outfile.write(',\n'.join(lines))
+    else:
+        for i, plane in enumerate(planes):
+            if i > 0:
+                outfile.write(',\n')
+            outfile.write(' ' * indent + '// plane %d\n' % i)
+            lines = [(' ' * indent) + ','.join(['0x%04x' % i for i in chunk])
+                     for chunk in chunks(plane, map_words_per_row)]
+            outfile.write(',\n'.join(lines))
+    outfile.write('\n};\n\n')
 
     planepick = 2 ** depth - 1  # currently we always use all of the planes
     if use_intuition:
@@ -107,12 +138,15 @@ if __name__ == '__main__':
     parser.add_argument('--img_name', default='image', help="variable name of the image")
     parser.add_argument('--use_intuition', action='store_true', help="generate data for Intuition")
     parser.add_argument('--verbose', action='store_true', help="verbose mode")
+    parser.add_argument('--interleaved', action='store_true', help="store data in interleaved manner")
 
     args = parser.parse_args()
     im = Image.open(args.pngfile)
     if not os.path.exists(args.headerfile):
         with open(args.headerfile, 'w') as outfile:
-            write_amiga_image(im, outfile, img_name=args.img_name, use_intuition=args.use_intuition,
+            write_amiga_image(im, outfile, img_name=args.img_name,
+                              use_intuition=args.use_intuition,
+                              interleaved=args.interleaved,
                               verbose=args.verbose)
     else:
         print("file '%s' already exists." % args.headerfile)
