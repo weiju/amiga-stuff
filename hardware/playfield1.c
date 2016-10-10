@@ -23,8 +23,12 @@
 
 #ifdef INTERLEAVED
 #include "kingtut-interleaved.h"
+// in interleaved mode, skip the following 4 lines = 4 * (320 / 8) = 160 bytes
+// that contain the current line for the next 4 bitplanes
+#define BPL_MODULO (4 * 40)
 #else
 #include "kingtut.h"
+#define BPL_MODULO 0
 #endif /* INTERLEAVED */
 
 #define NUM_COLORS 32
@@ -75,7 +79,8 @@ int main(int argc, char **argv)
     custom.bplcon0 = 0x5200;  // use bitplane 1-5 = BPU 101, composite color enable
 #endif
     custom.bplcon1 = 0;  // horizontal scroll value = 0 for all playfields
-    custom.bpl1mod = 0;  // modulo = 0 for odd bitplanes
+    custom.bpl1mod = BPL_MODULO;  // modulo = 0 for odd bitplanes
+    custom.bpl2mod = BPL_MODULO;  // modulo = 0 for odd bitplanes
     custom.dmacon  = 0x20;
     custom.ddfstrt = DDFSTRT_VALUE;
     custom.ddfstop = DDFSTOP_VALUE;
@@ -87,11 +92,23 @@ int main(int argc, char **argv)
     }
 
     // Initialize copper list with image data address
+#ifdef INTERLEAVED
+    // in interleaved mode, each plane's *rows* are organized
+    // consecutively one after another
+    for (int i = 0; i < NUM_BITPLANES; i++) {
+        ULONG addr = (ULONG) &(image_data[i * 20]);
+        coplist[i * 4 + 1] = (addr >> 16) & 0xffff;
+        coplist[i * 4 + 3] = addr & 0xffff;
+    }
+#else
+    // in non-interleaved mode, each plane's data is placed
+    // consecutively one after another
     for (int i = 0; i < NUM_BITPLANES; i++) {
         ULONG addr = (ULONG) &(image_data[i * 20 * NUM_RASTER_LINES]);
         coplist[i * 4 + 1] = (addr >> 16) & 0xffff;
         coplist[i * 4 + 3] = addr & 0xffff;
     }
+#endif
 
     // and point to the copper list
     custom.cop1lc = (ULONG) coplist;
