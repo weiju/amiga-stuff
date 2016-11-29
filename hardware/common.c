@@ -17,7 +17,7 @@ static ULONG oldresolution;
 
 struct ExecBase **exec_base_ptr = (struct ExecBase **) (4L);
 
-static void ApplySpriteFix(void)
+static void apply_sprite_fix(void)
 {
     if (wbscreen = LockPubScreen(WB_SCREEN_NAME)) {
         struct TagItem video_control_tags[] = {
@@ -36,7 +36,7 @@ static void ApplySpriteFix(void)
     }
 }
 
-static void UnapplySpriteFix(void)
+static void unapply_sprite_fix(void)
 {
     if (wbscreen) {
         struct TagItem video_control_tags[] = {
@@ -60,11 +60,9 @@ BOOL init_display(void)
 
     // Kickstart > 3.0: fix sprite bug
     if (lib_version >= 39) {
-        ApplySpriteFix();
+        apply_sprite_fix();
         is_pal = (((struct GfxBase *) GfxBase)->DisplayFlags & PAL) == PAL;
     } else {
-        // Note: FS-UAE reports 0 this, so essentially, there is no information
-        // for 1.x
         int vblank_freq = (*exec_base_ptr)->VBlankFrequency;
         printf("Gfx Lib version: %u, Vertical Blank Frequency: %d\n", lib_version, vblank_freq);
         is_pal = vblank_freq == VFREQ_PAL;
@@ -76,7 +74,7 @@ void reset_display(void)
 {
     struct View *current_view = ((struct GfxBase *) GfxBase)->ActiView;
     UWORD lib_version = GfxBase->LibNode.lib_Version;
-    if (lib_version >= 39) UnapplySpriteFix();
+    if (lib_version >= 39) unapply_sprite_fix();
     LoadView(current_view);
     WaitTOF();
     WaitTOF();

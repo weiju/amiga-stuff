@@ -75,6 +75,8 @@ def write_amiga_image(im, outfile, img_name, use_intuition, interleaved, verbose
     # colors is a list of 3-integer lists ([[r1, g1, b1], ...])
     colors = [i for i in chunks([b for b in im.palette.tobytes()], 3)]
     depth = round(math.log(len(colors), 2))
+    if depth == 0:
+        raise Exception("images with only 1 color can't be handled")
     # fill the missing colors with black entries
     num_missing_colors = 2 ** depth - len(colors)
     colors += [[0, 0, 0]] * num_missing_colors

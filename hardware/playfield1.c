@@ -5,7 +5,7 @@
 #include "common.h"
 
 #define NUM_BITPLANES 5
-#define INTERLEAVED
+//#define INTERLEAVED
 
 #ifdef USE_PAL
 
@@ -57,6 +57,7 @@ static UWORD __chip coplist[] = {
     COP_MOVE(BPL4PTL, 0),
     COP_MOVE(BPL5PTH, 0),
     COP_MOVE(BPL5PTL, 0),
+    COP_MOVE(COLOR00, 0),
     COP_WAIT_END,
     COP_WAIT_END
 };
@@ -87,6 +88,7 @@ int main(int argc, char **argv)
 
     custom.diwstrt = DIWSTRT_VALUE;
     custom.diwstop = DIWSTOP_VALUE;
+    // should be done in copper list, because workbench copper list could overwrite it
     for (int i = 0; i < NUM_COLORS; i++) {
         custom.color[i] = image_colors[i];
     }
@@ -95,6 +97,7 @@ int main(int argc, char **argv)
 #ifdef INTERLEAVED
     // in interleaved mode, each plane's *rows* are organized
     // consecutively one after another
+    printf("interleaved\n");
     for (int i = 0; i < NUM_BITPLANES; i++) {
         ULONG addr = (ULONG) &(image_data[i * 20]);
         coplist[i * 4 + 1] = (addr >> 16) & 0xffff;
@@ -103,6 +106,7 @@ int main(int argc, char **argv)
 #else
     // in non-interleaved mode, each plane's data is placed
     // consecutively one after another
+    printf("non-interleaved\n");
     for (int i = 0; i < NUM_BITPLANES; i++) {
         ULONG addr = (ULONG) &(image_data[i * 20 * NUM_RASTER_LINES]);
         coplist[i * 4 + 1] = (addr >> 16) & 0xffff;
