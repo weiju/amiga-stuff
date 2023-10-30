@@ -37,9 +37,15 @@ def read_int32(infile):
     return struct.unpack('>i', infile.read(4))[0]
 
 
+def read_uint32(infile):
+    return struct.unpack('>I', infile.read(4))[0]
+
 def read_int16(infile):
     return struct.unpack('>h', infile.read(2))[0]
 
+
+def read_uint16(infile):
+    return struct.unpack('>H', infile.read(2))[0]
 
 def read_string_list(infile):
     result = []
@@ -51,6 +57,26 @@ def read_string_list(infile):
     return []
 
 
+def read_string(infile):
+    result = None
+    strlen = read_uint32(infile) * 4
+    if strlen == 0:
+        return None
+    result = str(infile.read(strlen))
+    idx = result.find("\0")
+    return result[:idx]
+
+
+def read_symbols(infile):
+    result = []
+    symbol = read_string(infile)
+    while symbol is not None:
+        offset = read_int32(infile)  # actually uint32
+        result.append({"symbol": symbol, "offset": offset})
+        symbol = read_string(infile)
+    return result
+
+
 def read_raw_bytes(infile):
     num_bytes = read_int32(infile) * 4
     data = infile.read(num_bytes)
@@ -58,6 +84,7 @@ def read_raw_bytes(infile):
         print("WARNING: tried to read %d bytes, but only %d bytes could be read" % (num_bytes,
                                                                                     bytes_read))
     return data
+
 
 def read_reloc32map(infile):
     num_offsets = read_int32(infile)
@@ -110,6 +137,8 @@ def read_block(infile, is_loadfile):
         return ('BSS', read_int32(infile) * 4)
     elif id == HUNK_BLOCK_NAME:
         return ('NAME', str(infile.read(read_int32(infile) * 4)))
+    elif id == HUNK_BLOCK_SYMBOL:
+        return ('SYMBOL', read_symbols(infile))
     else:
         raise Exception("unsupported id: %s" % id)
 
