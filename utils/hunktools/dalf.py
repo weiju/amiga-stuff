@@ -47,15 +47,6 @@ def read_int16(infile):
 def read_uint16(infile):
     return struct.unpack('>H', infile.read(2))[0]
 
-def read_string_list(infile):
-    result = []
-    strlen = read_int32(infile)
-    while strlen > 0:
-        result.append(str(infile.read(strlen)))
-        strlen = read_int32(infile)
-
-    return []
-
 
 def read_string(infile):
     result = None
@@ -65,6 +56,15 @@ def read_string(infile):
     result = str(infile.read(strlen))
     idx = result.find("\0")
     return result[:idx]
+
+
+def read_string_list(infile):
+    result = []
+    s = read_string(infile)
+    while s is not None:
+        result.append(s)
+        s = read_string(infile)
+    return result
 
 
 def read_symbols(infile):
