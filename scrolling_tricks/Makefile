@@ -3,7 +3,7 @@ ASM_FLAGS = -Fhunk -devpac
 .SUFFIXES = .o .asm .c
 PROGRAMS=xunlimited xlimited xylimited xyunlimited xyunlimited2 yunlimited yunlimited2
 
-CC=vc +aos68k
+CC=vc +kick13
 CFLAGS=-c99 -I$(NDK_INC) -DDEBUG
 
 all: $(PROGRAMS)
